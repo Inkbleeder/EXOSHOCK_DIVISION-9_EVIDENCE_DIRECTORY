@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIVISION-9 EVIDENCE DIRECTORY</title>
+
+    <!-- Inline critical styles: prevents a flash of default (grey/monochrome)
+         browser styling before style.css finishes loading -->
+    <style>
+        html, body {
+            background:#020503;
+            margin:0;
+            padding:0;
+        }
+
+        #app {
+            visibility: hidden;
+        }
+    </style>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- CRT Overlay -->
+    <div id="crt-overlay"></div>
+
+    <main id="app">
+
+        <!-- Window chrome -->
+        <header id="app-header">
+
+            <div class="window-controls">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+
+            <span class="app-title">DIVISION-9 EVIDENCE DIRECTORY</span>
+
+            <span id="connection-status">OFFLINE</span>
+
+        </header>
+
+        <div id="app-body">
+
+            <!-- Sidebar: display-only directory tree, no click interaction -->
+            <aside id="sidebar">
+
+                <div class="sidebar-title">DIRECTORY</div>
+
+                <div id="sidebar-tree"></div>
+
+            </aside>
+
+            <section id="main-panel">
+
+                <!-- Viewport: shows video / image when accessed. Audio has
+                     no visual output, so it just shows a status card. -->
+                <div id="viewport">
+
+                    <div id="viewport-empty">NO FILE LOADED</div>
+
+                    <video id="viewport-video" class="hidden"></video>
+
+                    <img id="viewport-image" class="hidden">
+
+                    <div id="viewport-audio-card" class="hidden">
+                        <div id="audio-card-name"></div>
+                        <div id="audio-card-status">STOPPED</div>
+                    </div>
+
+                </div>
+
+                <div id="now-playing">NO FILE LOADED</div>
+
+                <section id="terminal-output"></section>
+
+                <footer id="terminal-input">
+
+                    <span id="prompt">&gt;</span>
+
+                    <input
+                        id="command-input"
+                        type="text"
+                        autocomplete="off"
+                        spellcheck="false"
+                        autofocus
+                    />
+
+                </footer>
+
+            </section>
+
+        </div>
+
+    </main>
+
+    <!-- Actual playable audio element (viewport-audio-card above is just its status display) -->
+    <audio id="audio-player"></audio>
+
+    <!-- Scripts -->
+    <script src="media.js?v=1"></script>
+    <script src="evidence.js?v=1"></script>
+
+</body>
+</html>
