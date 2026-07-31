@@ -53,6 +53,31 @@ history, Tab autocompletes the argument after "access "
 keypress while text is mid-typewriter-animation instantly
 completes it.
 
+SOUND EFFECTS
+-------------
+Reuses the exact same .wav files as the main terminal site -
+no new files needed. The paths in evidence.js (near the top,
+in the AUDIO section) point to "../audio/...", assuming this
+evidence/ folder sits right next to the main site's index.html
+(so /audio is one level up). If your actual folder layout is
+different, edit those five paths in evidence.js to match.
+
+Ported: startup, keypress, error, success, ambience.
+NOT ported (not applicable here): loginerror, loginsuccess,
+idle - those are tied to the main site's login/idle systems,
+which this site doesn't have.
+
+Same volume-editing approach as the main site: SOUND_VOLUME
+near the top of evidence.js, 0 (silent) to 1 (full volume).
+
+CLICK TO FOCUS
+--------------
+Clicking anywhere on the page focuses the command input (so
+people can start typing immediately without having to click
+directly in the input box first) and also unblocks ambience
+playback, since browsers require a user gesture before audio
+can play - same behavior as the main site.
+
 NO LOGIN / NO ACCOUNTS
 -----------------------
 This site has none of the main site's login or clearance
