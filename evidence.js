@@ -38,6 +38,147 @@ document.getElementById("app").style.visibility = "visible";
 
 /*
 ===========================================================
+AUDIO
+
+Uses copies of the same .wav files as the main terminal
+site, sitting in an /audio folder that belongs to THIS site
+specifically (evidence/audio/), not shared with the main
+site's folder - the two sites are hosted as separate repos,
+so a "../audio/" path pointing at the main site wouldn't
+actually work. Copy your .wav files into evidence/audio/
+using these names (or edit the paths below to match
+whatever you name them).
+
+Volume for each sound is controlled by SOUND_VOLUME below -
+edit any number there (0 = silent, 1 = full volume).
+
+  audio/startup.wav    -> plays once on boot
+  audio/keypress.wav   -> plays once per keystroke
+  audio/error.wav      -> unknown command, file not found,
+                              "no file loaded"
+  audio/success.wav    -> database, access (loading a file
+                              or listing a category), play,
+                              pause, stop
+  audio/ambience.wav   -> looping background track, starts
+                              on the user's first interaction
+===========================================================
+*/
+
+const SOUND_FILES = {
+
+    startup:    "audio/startup.wav",
+    keypress:   "audio/keypress.wav",
+    error:      "audio/error.wav",
+    success:    "audio/success.wav",
+    ambience:   "audio/ambience.wav"
+
+};
+
+const SOUND_VOLUME = {
+
+    startup:    1,
+    keypress:   0.6,
+    error:      1,
+    success:    1,
+    ambience:   0.25
+
+};
+
+const sounds = {};
+
+Object.keys(SOUND_FILES).forEach(name=>{
+
+    let el = document.getElementById(name);
+
+    el.src = SOUND_FILES[name];
+
+    el.volume = SOUND_VOLUME[name] !== undefined ? SOUND_VOLUME[name] : 1;
+
+    sounds[name] = el;
+
+});
+
+
+// If a wav file is missing, misnamed, or in a format the
+// browser can't decode, log which one so it's easy to spot
+// instead of failing completely silently.
+Object.keys(sounds).forEach(name=>{
+
+    sounds[name].addEventListener("error", ()=>{
+
+        console.warn(
+
+            `[audio] "${name}" failed to load - check that ` +
+            `${SOUND_FILES[name]} exists and is a valid wav file.`
+
+        );
+
+    });
+
+});
+
+
+function playSound(name){
+
+    let sound = sounds[name];
+
+    if(!sound) return;
+
+    try{
+
+        sound.currentTime = 0;
+
+        // play() returns a promise that rejects if the browser
+        // blocks autoplay (e.g. before the user has interacted
+        // with the page yet) - catch it so it fails silently
+        // instead of throwing console errors.
+        sound.play().catch(()=>{});
+
+    }
+
+    catch(err){
+
+        sound.play().catch(()=>{});
+
+    }
+
+}
+
+
+
+/*
+===========================================================
+BACKGROUND AMBIENCE
+
+A quiet looping track that starts on the user's first
+interaction with the page (browsers block audio from
+autoplaying before that).
+===========================================================
+*/
+
+let ambienceStarted = false;
+
+sounds.ambience.loop = true;
+
+
+function startAmbience(){
+
+    if(ambienceStarted) return;
+
+    ambienceStarted = true;
+
+    sounds.ambience.play().catch(()=>{
+
+        ambienceStarted = false;
+
+    });
+
+}
+
+
+
+/*
+===========================================================
 BOOT SEQUENCE
 ===========================================================
 */
@@ -50,6 +191,8 @@ bootSequence();
 
 
 async function bootSequence(){
+
+    playSound("startup");
 
     await printLine("DIVISION-9 EVIDENCE DIRECTORY", "boot");
     await printLine("--------------------------------------", "system");
@@ -221,6 +364,9 @@ input.addEventListener(
 async function(event){
 
 
+    startAmbience();
+
+
     // Any keypress while text is still typing out instantly
     // completes everything currently queued.
     if(isPrinting){
@@ -284,6 +430,8 @@ async function(event){
 
 
     if(event.key !== "Enter"){
+
+        playSound("keypress");
 
         tabBase = null;
 
@@ -424,6 +572,8 @@ async function execute(text){
 
         case "help":
 
+            playSound("success");
+
             printLine(
             "Available commands:",
             "success"
@@ -500,6 +650,8 @@ async function execute(text){
 
 
         default:
+
+            playSound("error");
 
             printLine(
             "UNKNOWN COMMAND",
@@ -621,6 +773,8 @@ DATABASE
 
 function databaseCommand(){
 
+    playSound("success");
+
     printLine(
     "EVIDENCE INDEX - CATEGORIES:",
     "success"
@@ -711,6 +865,8 @@ function accessCommand(name){
 
     if(!name){
 
+        playSound("error");
+
         printLine(
         "USAGE: access <file / category>",
         "error"
@@ -744,6 +900,8 @@ function accessCommand(name){
 
     if(matches.length > 0){
 
+        playSound("success");
+
         printLine(
         `CATEGORY: ${name.toUpperCase()}`,
         "success"
@@ -775,6 +933,8 @@ function accessCommand(name){
 
     if(subMatches.length > 0){
 
+        playSound("success");
+
         printLine(
         `SUBCATEGORY: ${name.toUpperCase()}`,
         "success"
@@ -792,6 +952,8 @@ function accessCommand(name){
 
     }
 
+
+    playSound("error");
 
     printLine(
     "FILE NOT FOUND",
@@ -879,6 +1041,8 @@ function loadItem(key){
 
     updateNowPlaying();
 
+    playSound("success");
+
 
     printLine(
     `FILE LOADED: ${key.toUpperCase()}`,
@@ -906,6 +1070,8 @@ function playCommand(){
 
     if(!currentItem){
 
+        playSound("error");
+
         printLine("NO FILE LOADED", "error");
 
         return;
@@ -914,6 +1080,9 @@ function playCommand(){
 
 
     let entry = media[currentItem];
+
+
+    playSound("success");
 
 
     if(entry.type === "audio"){
@@ -962,6 +1131,8 @@ function pauseCommand(){
 
     if(!currentItem){
 
+        playSound("error");
+
         printLine("NO FILE LOADED", "error");
 
         return;
@@ -999,6 +1170,8 @@ function pauseCommand(){
 
     playbackState = "PAUSED";
 
+    playSound("success");
+
     printLine("PAUSED", "warning");
 
     updateNowPlaying();
@@ -1011,6 +1184,8 @@ function stopCommand(silent){
     if(!currentItem){
 
         if(!silent){
+
+            playSound("error");
 
             printLine("NO FILE LOADED", "error");
 
@@ -1061,6 +1236,8 @@ function stopCommand(silent){
 
     if(!silent){
 
+        playSound("success");
+
         printLine("STOPPED", "warning");
 
     }
@@ -1099,6 +1276,8 @@ function stepReveal(now){
 
         revealFrame = null;
 
+        playSound("success");
+
         printLine("REVEAL COMPLETE", "success");
 
         updateNowPlaying();
@@ -1131,6 +1310,8 @@ audioPlayer.addEventListener("ended", ()=>{
 
         audioCardStatus.textContent = "STOPPED";
 
+        playSound("success");
+
         printLine("PLAYBACK FINISHED", "success");
 
         updateNowPlaying();
@@ -1146,6 +1327,8 @@ viewportVideo.addEventListener("ended", ()=>{
 
         playbackState = "STOPPED";
 
+        playSound("success");
+
         printLine("PLAYBACK FINISHED", "success");
 
         updateNowPlaying();
@@ -1153,3 +1336,19 @@ viewportVideo.addEventListener("ended", ()=>{
     }
 
 });
+
+
+
+/*
+===========================================================
+CLICK TO FOCUS
+===========================================================
+*/
+
+document.body.onclick=()=>{
+
+    input.focus();
+
+    startAmbience();
+
+};
