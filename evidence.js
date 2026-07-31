@@ -183,13 +183,6 @@ BOOT SEQUENCE
 ===========================================================
 */
 
-input.disabled = true;
-
-buildSidebar();
-
-bootSequence();
-
-
 async function bootSequence(){
 
     playSound("startup");
@@ -1352,3 +1345,22 @@ document.body.onclick=()=>{
     startAmbience();
 
 };
+
+
+
+/*
+===========================================================
+START
+
+This has to be the very last thing in the file - it calls
+functions and uses variables (printQueue, etc.) that are
+declared further up, and in JavaScript those declarations
+must have actually run before anything can use them.
+===========================================================
+*/
+
+input.disabled = true;
+
+buildSidebar();
+
+bootSequence();
