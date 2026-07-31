@@ -1370,8 +1370,8 @@ a fake "you've been breached" hack sequence (the intruder is
 deliberately left unnamed, same as the main site's petrify),
 then a personal warning message with randomized deep-space
 coordinates, then a 10 second self-destruct countdown ending
-in a full blackout. See the note above about window.close()
-only working in rare cases - the blackout is the real effect.
+in a full blackout ('reset' - hinted at near the cursor
+block - reloads the page back to a fresh boot).
 ===========================================================
 */
 
@@ -1527,11 +1527,6 @@ async function theseusEvent(){
     input.disabled = false;
 
     input.focus();
-
-
-    // Only actually works if this tab was opened via script - see
-    // the comment above this function. Harmless to attempt anyway.
-    window.close();
 
 }
 
