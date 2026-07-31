@@ -55,12 +55,12 @@ completes it.
 
 SOUND EFFECTS
 -------------
-Reuses the exact same .wav files as the main terminal site -
-no new files needed. The paths in evidence.js (near the top,
-in the AUDIO section) point to "../audio/...", assuming this
-evidence/ folder sits right next to the main site's index.html
-(so /audio is one level up). If your actual folder layout is
-different, edit those five paths in evidence.js to match.
+Uses copies of the same .wav files as the main terminal
+site, but this site needs its OWN copies - put them in
+evidence/audio/ (a new folder, sibling to index.html,
+media.js, etc. within this site's own files). This is a
+separate repo/host from the main site, so it can't point at
+the main site's /audio folder directly.
 
 Ported: startup, keypress, error, success, ambience.
 NOT ported (not applicable here): loginerror, loginsuccess,
