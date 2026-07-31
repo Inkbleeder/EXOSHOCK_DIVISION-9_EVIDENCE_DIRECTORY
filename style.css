@@ -568,6 +568,37 @@ body::before{
 
 }
 
+#self-destruct-hint{
+
+    position:absolute;
+
+    top:19px;
+    left:42px;
+
+    color:var(--green);
+
+    font-family:"Courier New", monospace;
+
+    font-size:11px;
+
+    letter-spacing:2px;
+
+    text-shadow:0 0 10px var(--green);
+
+    animation:hintfade 4s ease-in-out infinite;
+
+}
+
+@keyframes hintfade{
+
+    0%{opacity:0;}
+    15%{opacity:.6;}
+    40%{opacity:.6;}
+    55%{opacity:0;}
+    100%{opacity:0;}
+
+}
+
 @keyframes blink{
 
     0%{opacity:1;}
