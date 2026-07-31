@@ -550,6 +550,32 @@ body::before{
 
 }
 
+#self-destruct-cursor{
+
+    position:absolute;
+
+    top:16px;
+    left:16px;
+
+    width:16px;
+    height:16px;
+
+    background:var(--green);
+
+    box-shadow:0 0 14px var(--green);
+
+    animation:blink 1s steps(1) infinite;
+
+}
+
+@keyframes blink{
+
+    0%{opacity:1;}
+    50%{opacity:0;}
+    100%{opacity:1;}
+
+}
+
 #self-destruct-text{
 
     color:var(--red);
@@ -558,10 +584,16 @@ body::before{
 
     font-size:13px;
 
-    letter-spacing:4px;
+    line-height:1.8;
+
+    letter-spacing:2px;
 
     text-shadow:0 0 20px var(--red);
 
-    opacity:.75;
+    opacity:.85;
+
+    text-align:center;
+
+    white-space:pre;
 
 }
