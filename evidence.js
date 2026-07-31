@@ -552,6 +552,22 @@ async function execute(text){
     let command=args[0].toLowerCase();
 
 
+    if(terminated){
+
+        if(command === "reset"){
+
+            location.reload();
+
+        }
+
+        // Anything else is silently ignored - the site is
+        // "dead" at this point, no error messages, no hints
+        // beyond the fading text next to the cursor.
+        return;
+
+    }
+
+
     switch(command){
 
 
@@ -978,6 +994,10 @@ the reveal is just treated as this file's "playback".
 */
 
 let currentItem = null;
+
+// Set true once 'theseus' finishes its countdown - while true,
+// execute() only responds to 'reset'.
+let terminated = false;
 let playbackState = "STOPPED"; // STOPPED | PLAYING | PAUSED
 
 let revealProgress = 0;
@@ -1500,6 +1520,13 @@ async function theseusEvent(){
 
 
     sounds.ambience.pause();
+
+
+    terminated = true;
+
+    input.disabled = false;
+
+    input.focus();
 
 
     // Only actually works if this tab was opened via script - see
