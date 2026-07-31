@@ -1458,7 +1458,9 @@ async function theseusEvent(){
 
     await sleep(600);
 
-    await printLine(randomDeepSpaceCoordinates(), "success");
+    let coords = randomDeepSpaceCoordinates();
+
+    await printLine(coords, "success");
 
     await sleep(1500);
 
@@ -1485,7 +1487,14 @@ async function theseusEvent(){
     let overlay = document.getElementById("self-destruct-overlay");
     let overlayText = document.getElementById("self-destruct-text");
 
-    overlayText.textContent = "CONNECTION TERMINATED";
+    overlayText.textContent =
+
+        "\u2620\uFE0E\u2620\uFE0E\u2620\uFE0E\n\n" +
+        "They're coming for you.\n" +
+        "Don't end up like the last guy.\n" +
+        "Lay low for a while. Meet at these coordinates:\n\n" +
+        coords + "\n\n" +
+        "\u2620\uFE0E\u2620\uFE0E\u2620\uFE0E";
 
     overlay.classList.add("visible");
 
