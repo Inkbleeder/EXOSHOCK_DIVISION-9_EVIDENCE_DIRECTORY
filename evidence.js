@@ -642,6 +642,14 @@ async function execute(text){
 
 
 
+        case "theseus":
+
+            theseusEvent();
+
+        break;
+
+
+
         default:
 
             playSound("error");
@@ -1329,6 +1337,167 @@ viewportVideo.addEventListener("ended", ()=>{
     }
 
 });
+
+
+
+/*
+===========================================================
+THESEUS
+
+Hidden command - not listed in 'help', discoverable only if
+someone knows to type it. Plays a decrypt-style intro, then
+a fake "you've been breached" hack sequence (the intruder is
+deliberately left unnamed, same as the main site's petrify),
+then a personal warning message with randomized deep-space
+coordinates, then a 10 second self-destruct countdown ending
+in a full blackout. See the note above about window.close()
+only working in rare cases - the blackout is the real effect.
+===========================================================
+*/
+
+function randomDeepSpaceCoordinates(){
+
+    let raH = Math.floor(Math.random()*24);
+    let raM = Math.floor(Math.random()*60);
+    let raS = (Math.random()*60).toFixed(1);
+
+    let decSign = Math.random() < 0.5 ? "-" : "+";
+    let decD = Math.floor(Math.random()*90);
+    let decM = Math.floor(Math.random()*60);
+    let decS = (Math.random()*60).toFixed(1);
+
+    let pad = n => String(n).padStart(2,"0");
+
+    return `RA ${pad(raH)}h ${pad(raM)}m ${raS}s   DEC ${decSign}${pad(decD)}° ${pad(decM)}′ ${decS}″`;
+
+}
+
+
+async function theseusEvent(){
+
+
+    await printLine("//-DECRYPTING SIGNAL", "system");
+
+    await sleep(500);
+
+
+    await printLine("//-SOURCE: UNKNOWN", "system");
+
+    await sleep(500);
+
+
+    await printLine("//-[SOMEONE ELSE IS ALREADY INSIDE]", "error");
+
+    await sleep(900);
+
+
+    await printLine("");
+
+
+    playSound("error");
+
+    document.getElementById("app").classList.add("self-destructing");
+
+
+    await printLine("!! UNAUTHORIZED SESSION DETECTED", "error");
+
+    await sleep(500);
+
+    await printLine("session origin......... UNTRACEABLE", "system");
+
+    await sleep(400);
+
+    await printLine("attempting lockout...... FAILED", "error");
+
+    await sleep(600);
+
+    await printLine("root access requested... GRANTED", "warning");
+
+    await sleep(700);
+
+    await printLine("");
+
+    await printLine("listing active processes...", "system");
+
+    await sleep(400);
+
+    await printLine("  > evidence_directory.exe", "system");
+
+    await sleep(250);
+
+    await printLine("  > sound_engine.dll", "system");
+
+    await sleep(250);
+
+    await printLine("  > viewport_render.dll", "system");
+
+    await sleep(600);
+
+    await printLine("");
+
+    await printLine("terminating local control...", "error");
+
+    await sleep(700);
+
+    await printLine("local control: REVOKED", "error");
+
+    await sleep(1200);
+
+
+    await printLine("");
+
+    await printLine("They're coming for you.", "warning");
+
+    await sleep(700);
+
+    await printLine("Don't end up like the last guy.", "warning");
+
+    await sleep(700);
+
+    await printLine("Lay low for a while. Meet at these coordinates:", "warning");
+
+    await sleep(600);
+
+    await printLine(randomDeepSpaceCoordinates(), "success");
+
+    await sleep(1500);
+
+
+    await printLine("");
+
+    await printLine("SELF-DESTRUCT SEQUENCE INITIATED", "error");
+
+    await sleep(1000);
+
+
+    input.disabled = true;
+
+
+    for(let i=10; i>=1; i--){
+
+        printLine(`T-MINUS ${i}...`, "error");
+
+        await sleep(1000);
+
+    }
+
+
+    let overlay = document.getElementById("self-destruct-overlay");
+    let overlayText = document.getElementById("self-destruct-text");
+
+    overlayText.textContent = "CONNECTION TERMINATED";
+
+    overlay.classList.add("visible");
+
+
+    sounds.ambience.pause();
+
+
+    // Only actually works if this tab was opened via script - see
+    // the comment above this function. Harmless to attempt anyway.
+    window.close();
+
+}
 
 
 
