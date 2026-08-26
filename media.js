@@ -97,20 +97,126 @@ Replace with a real entry once you have actual video files.
 
 /*
 ===========================================================
-EXAMPLE - IMAGE
-Replace with a real entry once you have actual image files.
+SITE PHOTOGRAPHS
+Interior captures pulled from the facility.
 ===========================================================
 */
 
-"example photograph": {
+"environment photo 1": {
 
-    category: "Images",
+    category: "Site Photographs",
 
     type: "image",
 
-    file: "media/images/example.jpg",
+    file: "media/images/Environment_1.png",
 
-    description: "Placeholder entry - replace the file path once you add real images."
+    description: "Interior capture - red-lit chamber, raised platform with twin console housings."
+
+},
+
+"environment photo 2": {
+
+    category: "Site Photographs",
+
+    type: "image",
+
+    file: "media/images/Environment_2.png",
+
+    description: "Interior capture - lounge/seating area, green support column, hex-paneled corridor beyond."
+
+},
+
+"environment photo 3": {
+
+    category: "Site Photographs",
+
+    type: "image",
+
+    file: "media/images/Environment_3.png",
+
+    description: "Interior capture - corridor junction, exposed conduit arcing along the ceiling."
+
+},
+
+"environment photo 4": {
+
+    category: "Site Photographs",
+
+    type: "image",
+
+    file: "media/images/Environment_4.png",
+
+    description: "Interior capture - gated threshold, green floodlighting, marked approach path."
+
+},
+
+"environment photo 5": {
+
+    category: "Site Photographs",
+
+    type: "image",
+
+    file: "media/images/Environment_5.png",
+
+    description: "Interior capture - control room, dual console arrays flanking a central housing."
+
+},
+
+"environment photo 6": {
+
+    category: "Site Photographs",
+
+    type: "image",
+
+    file: "media/images/Environment_6.png",
+
+    description: "Interior capture - stairwell, armed figure visible at range."
+
+},
+
+"environment photo 7": {
+
+    category: "Site Photographs",
+
+    type: "image",
+
+    file: "media/images/Environment_7.png",
+
+    description: "Interior capture - maintenance corridor, green-lit piping and support struts."
+
+},
+
+"unmarked interior capture": {
+
+    category: "Site Photographs",
+
+    subcategory: "Unlogged",
+
+    type: "image",
+
+    file: "media/images/HighresScreenshot00034.png",
+
+    description: "Raw capture, source unlogged - illuminated coolant(?) cells along a maintenance walkway."
+
+},
+
+
+
+/*
+===========================================================
+INSIGNIA
+===========================================================
+*/
+
+"founders patch": {
+
+    category: "Insignia",
+
+    type: "image",
+
+    file: "media/images/patch_founders3.png",
+
+    description: "Recovered emblem - winged serpent motif over a stylised blade and chevrons."
 
 }
 
