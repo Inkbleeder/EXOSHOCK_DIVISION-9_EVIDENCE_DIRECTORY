@@ -29,21 +29,6 @@ const nowPlaying  = document.getElementById("now-playing");
 const audioPlayer = document.getElementById("audio-player");
 
 
-// Reveal the app immediately - style.css is guaranteed loaded
-// by the time this script runs, since <script> tags after
-// <link rel="stylesheet"> in the HTML always wait for it.
-document.getElementById("app").style.visibility = "visible";
-
-// The self-destruct overlay lives outside #app in the DOM (so
-// it can cover the whole screen during 'theseus'), so it needs
-// the same treatment - otherwise its hint text flashes
-// unstyled during that same brief window. It stays practically
-// invisible day-to-day regardless, via its own opacity:0 rule
-// in style.css - this only controls the pre-CSS-load flash.
-document.getElementById("self-destruct-overlay").style.visibility = "visible";
-
-
-
 /*
 ===========================================================
 AUDIO
