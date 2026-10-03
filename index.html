@@ -2,50 +2,83 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DIVISION 9 // EVIDENCE ARCHIVE</title>
-<link rel="stylesheet" href="css/style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>BSLSK Division-9 Evidence Archive</title>
+
+<!-- Inline critical styles: paint the dark background immediately and
+     keep the UI invisible until main.js adds the "ready" class once the
+     page has fully loaded. This stops the grey, half-styled flash on
+     startup (same trick as the main terminal). -->
+<style>
+  html, body { background:#020503; margin:0; padding:0; }
+  #app, #crt-overlay, #idle-banner { visibility:hidden; }
+  html.ready #app, html.ready #crt-overlay, html.ready #idle-banner { visibility:visible; }
+</style>
+<noscript><style>#app, #crt-overlay { visibility:visible; }</style></noscript>
+
+<link rel="stylesheet" href="css/style.css?v=2">
 </head>
 <body>
-  <!-- CRT atmosphere layers -->
-  <div id="scanlines" aria-hidden="true"></div>
+
+  <!-- CRT overlay -->
   <div id="crt-overlay" aria-hidden="true"></div>
 
-  <div id="app">
-    <header id="topbar">
-      <span id="sys-title">DIVISION 9 // EVIDENCE ARCHIVE</span>
-      <span id="sys-status">SYSTEM ONLINE</span>
+  <!-- Idle banner (appears after ~5 minutes without input) -->
+  <div id="idle-banner" aria-hidden="true"><pre id="idle-banner-text"></pre></div>
+
+  <!-- Terminal frame - same box as the main site -->
+  <main id="app">
+
+    <div id="scanline-overlay" aria-hidden="true"></div>
+
+    <header id="terminal-header">
+      <span class="status">BSLSK DIVISION-9</span>
+      <span class="divider">|</span>
+      <span class="status" id="sys-title">EVIDENCE ARCHIVE</span>
+      <span class="divider">|</span>
+      <span id="sys-status">OFFLINE</span>
     </header>
 
-    <main id="desktop">
+    <!-- Output + draggable evidence windows -->
+    <div id="desktop">
       <section id="terminal-panel" aria-label="Archive terminal">
         <div id="terminal-output" aria-live="polite"></div>
-        <div id="terminal-input-wrap">
-          <span id="prompt">D9&gt;</span>
-          <span id="input-box">
-            <span id="mirror" aria-hidden="true"></span>
-            <input id="cmdline" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Terminal input">
-            <span id="cursor" aria-hidden="true">&#9608;</span>
-          </span>
-        </div>
       </section>
-    </main>
+    </div>
 
     <div id="taskbar">
       <span id="task-label">WINDOWS:</span>
       <div id="task-items"><span id="task-empty">NONE</span></div>
     </div>
 
-    <footer id="statusbar">
+    <div id="statusbar">
       <span id="status-open">NO FILE OPEN</span>
       <span id="status-right"></span>
-    </footer>
-  </div>
+    </div>
 
-  <script src="js/archive.js"></script>
-  <script src="js/windows.js"></script>
-  <script src="js/media.js"></script>
-  <script src="js/terminal.js"></script>
-  <script src="js/main.js"></script>
+    <footer id="terminal-input">
+      <span id="prompt">D9&gt;</span>
+      <input id="cmdline" type="text" autocomplete="off" autocapitalize="off"
+             autocorrect="off" spellcheck="false" enterkeyhint="go"
+             aria-label="Terminal input" autofocus>
+      <span class="cursor" id="input-cursor" aria-hidden="true"></span>
+      <span id="tab-hint"></span>
+    </footer>
+
+  </main>
+
+  <!-- Interface sounds (files are set from js/sound.js) -->
+  <audio id="startup"  preload="auto"></audio>
+  <audio id="keypress" preload="auto"></audio>
+  <audio id="error"    preload="auto"></audio>
+  <audio id="success"  preload="auto"></audio>
+  <audio id="ambience" preload="auto"></audio>
+
+  <script src="js/sound.js?v=2"></script>
+  <script src="js/archive.js?v=2"></script>
+  <script src="js/windows.js?v=2"></script>
+  <script src="js/media.js?v=2"></script>
+  <script src="js/terminal.js?v=2"></script>
+  <script src="js/main.js?v=2"></script>
 </body>
 </html>
