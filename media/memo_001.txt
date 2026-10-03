@@ -1,0 +1,23 @@
+DIVISION 9 - INTERNAL MEMORANDUM 001
+DATE: 1994-03-11
+FROM: COMMS SUPERVISOR, STATION 7
+TO:   ALL DECK OFFICERS
+
+RE: COMMS OUTAGE - DECK 3 AND BELOW
+
+At approximately 0230 hours the primary carrier
+link from Relay Station 7 dropped and did not
+restore. Backup carrier showed the same failure
+pattern. Manual inspection is scheduled for the
+0600 shift.
+
+Until further notice, all sublevel communications
+will run over the maintenance band. Expect noise
+and intermittency. Log every anomaly, however
+small, with time and position.
+
+Staff are reminded that the maintenance band is
+monitored by this office. Do not use it for
+personal traffic.
+
+[END OF MEMORANDUM]
