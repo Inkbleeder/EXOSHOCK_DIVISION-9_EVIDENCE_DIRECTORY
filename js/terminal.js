@@ -1,13 +1,16 @@
 "use strict";
-/* terminal.js - terminal UI, command registry, history, autocomplete,
-   result keyboard navigation. */
+/* terminal.js - terminal UI, command registry, typewriter output,
+   history, Tab completion, result keyboard navigation.
+
+   Output behaves like the main terminal: lines type out, any key
+   instantly completes them, bordered help boxes, highlighted search
+   matches, Tab cycles completions with a (1/3) counter. */
 
 const Term = (() => {
   const out = document.getElementById("terminal-output");
   const input = document.getElementById("cmdline");
-  const mirror = document.getElementById("mirror");
-  const cursorEl = document.getElementById("cursor");
   const promptEl = document.getElementById("prompt");
+  const tabHint = document.getElementById("tab-hint");
 
   const history = [];
   let histIdx = -1;
@@ -21,39 +24,141 @@ const Term = (() => {
   const commands = {};
   const aliases = {};
 
-  /* ---------- output helpers ---------- */
+  const TYPE_SPEED = 12;     // ms per character (same as the main terminal)
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  function print(text, cls) {
-    const lines = String(text).split("\n");
-    let last = null;
-    lines.forEach(l => {
-      const d = document.createElement("div");
-      d.className = "line" + (cls ? " " + cls : "");
-      d.textContent = l === "" ? "\u00a0" : l;
-      out.appendChild(d);
-      last = d;
-    });
-    scroll();
-    return last;
+  function mk(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
   }
 
-  function printHTML(html, cls) {
-    const d = document.createElement("div");
-    d.className = "line" + (cls ? " " + cls : "");
-    d.innerHTML = html;
-    out.appendChild(d);
-    return d;
-  }
+  /* ---------- typewriter print queue ----------
+     Elements are added to the page immediately (so callers can keep
+     using the element print() returns) but stay hidden until their
+     turn, so lines always appear in order. */
+
+  const queue = [];
+  let busy = false;
+  let fast = false;
 
   function scroll() { out.scrollTop = out.scrollHeight; }
 
+  function enqueue(item) {
+    queue.push(item);
+    if (!busy) pump();
+  }
+
+  async function pump() {
+    busy = true;
+    while (queue.length) {
+      const it = queue.shift();
+      it.el.style.display = "";
+      if (it.text) {
+        if (fast || it.instant) {
+          it.node.data = it.text;
+        } else {
+          for (let i = 1; i <= it.text.length; i++) {
+            if (fast) { it.node.data = it.text; break; }
+            it.node.data = it.text.slice(0, i);
+            scroll();
+            await sleep(TYPE_SPEED);
+          }
+        }
+      }
+      scroll();
+    }
+    busy = false;
+    fast = false;
+  }
+
+  /* any key while text is typing out completes it at once */
+  function skipTyping() { if (busy) fast = true; }
+
+  function whenIdle() {
+    return new Promise(res => {
+      (function chk() { if (!busy && queue.length === 0) res(); else setTimeout(chk, 30); })();
+    });
+  }
+
+  let lastErrSound = 0;
+
+  function print(text, cls, opts) {
+    const instant = !!(opts && opts.instant);
+    const lines = String(text).split("\n");
+    let last = null;
+    lines.forEach(l => {
+      const d = mk("div", "line" + (cls ? " " + cls : ""));
+      const node = document.createTextNode("");
+      d.appendChild(node);
+      d.style.display = "none";
+      out.appendChild(d);
+      enqueue({ el: d, node, text: l === "" ? "\u00a0" : l, instant });
+      last = d;
+    });
+    if (cls === "err" || cls === "error") {
+      const now = Date.now();
+      if (now - lastErrSound > 200) { lastErrSound = now; Sound.play("error"); }
+    }
+    return last;
+  }
+
+  /* HTML / DOM lines appear whole (no typing), in order */
+  function printHTML(html, cls) {
+    const d = mk("div", "line" + (cls ? " " + cls : ""));
+    d.innerHTML = html;
+    d.style.display = "none";
+    out.appendChild(d);
+    enqueue({ el: d });
+    return d;
+  }
+
+  function printNode(node) {
+    node.style.display = "none";
+    out.appendChild(node);
+    enqueue({ el: node });
+    return node;
+  }
+
   function clear() { out.innerHTML = ""; resetResults(); }
 
-  function echo(text) { print(promptEl.textContent + " " + text, "echo"); }
+  function echo(text) { print(promptEl.textContent + " " + text, "echo", { instant: true }); }
+
+  /* progress bar line, used by the boot sequence */
+  async function progress(text, skipFn) {
+    await whenIdle();
+    const d = mk("div", "line system");
+    out.appendChild(d);
+    for (let i = 0; i <= 10; i++) {
+      d.textContent = text + " [" + "\u2588".repeat(i) + "\u2591".repeat(10 - i) + "]";
+      scroll();
+      if (!(skipFn && skipFn())) await sleep(100);
+    }
+  }
+
+  /* one bordered box per command, like the main terminal's help */
+  function printBox(title, desc) {
+    const box = mk("div", "help-entry");
+    box.appendChild(mk("div", "help-entry-title", title));
+    if (desc) box.appendChild(mk("div", "help-entry-desc", desc));
+    return printNode(box);
+  }
+
+  /* wraps every match of `words` in <span class="hl"> (text is escaped) */
+  function hlHTML(text, words) {
+    text = String(text);
+    words = (words || []).filter(Boolean);
+    if (!words.length) return esc(text);
+    const re = new RegExp("(" + words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")", "ig");
+    return text.split(re).map((part, i) =>
+      i % 2 === 1 ? "<span class='hl'>" + esc(part) + "</span>" : esc(part)).join("");
+  }
 
   /* ---------- command registry ---------- */
 
@@ -70,34 +175,45 @@ const Term = (() => {
     results = []; resultEls = []; resultIdx = -1; resultsActive = false;
   }
 
-  function pad(s, n) { s = String(s); return s.length >= n ? s : s + " ".repeat(n - s.length); }
-
-  function showResults(list, header) {
+  function showResults(list, title, words) {
     resetResults();
-    if (header) print(header, "dim");
-    if (!list.length) { print("NO MATCHING RECORDS.", "dim"); return; }
-    print("ID      TYPE  TITLE" + " ".repeat(28) + "DATE       FILE", "head");
+    if (!list.length) { print("NO MATCHING RECORDS.", "warning"); return; }
+
+    const panel = mk("div", "ev-panel");
+    const head = mk("div", "ev-head");
+    head.appendChild(mk("span", "", title));
+    head.appendChild(mk("span", "", list.length + (list.length === 1 ? " RECORD" : " RECORDS")));
+    panel.appendChild(head);
+
     list.forEach(ev => {
-      const row = printHTML(
-        esc(pad(ev.id, 8)) + esc(pad("[" + TYPE_TAGS[ev.type] + "]", 6)) +
-        esc(pad(ev.title, 32)) + esc(pad(ev.date || "-", 11)) +
-        "<span class='rmeta'>" + esc(ev.filename || ev.file || "-") + "</span>",
-        "result-line"
-      );
+      const row = mk("div", "ev-row result-line");
+      row.appendChild(mk("span", "r-id", ev.id));
+      row.appendChild(mk("span", "ev-badge t-" + ev.type, TYPE_TAGS[ev.type]));
+      const t = mk("span", "r-title");
+      t.innerHTML = hlHTML(ev.title, words);
+      row.appendChild(t);
+      row.appendChild(mk("span", "r-date", ev.date || ""));
+      const f = mk("span", "r-file");
+      f.innerHTML = hlHTML(ev.filename || ev.file || "", words);
+      row.appendChild(f);
       row.addEventListener("click", () => { resetResults(); Media.open(ev); });
+      panel.appendChild(row);
       results.push(ev.id); resultEls.push(row);
     });
-    print(list.length + " RECORD(S). CLICK A ROW OR USE ARROWS + ENTER TO OPEN.", "dim");
+
+    printNode(panel);
+    print("TYPE AN ID TO OPEN IT, OR USE \u2191 \u2193 + ENTER ON AN EMPTY LINE. (CLICKING A ROW WORKS TOO.)", "dim");
+    Sound.play("success");
     resultsActive = true;
-    selectResult(0);
+    selectResult(0, true);
   }
 
-  function selectResult(i) {
+  function selectResult(i, noScroll) {
     resultEls.forEach(el => el.classList.remove("sel"));
     resultIdx = i;
     if (i >= 0 && resultEls[i]) {
       resultEls[i].classList.add("sel");
-      resultEls[i].scrollIntoView({ block: "nearest" });
+      if (!noScroll) resultEls[i].scrollIntoView({ block: "nearest" });
     }
   }
 
@@ -118,22 +234,28 @@ const Term = (() => {
     return true;
   }
 
-  /* ---------- autocomplete ---------- */
+  /* ---------- Tab completion (cycles in place, (n/total) counter) ---------- */
 
-  function complete() {
-    const v = input.value;
-    const selStart = input.selectionStart ?? v.length;
-    if (selStart !== v.length) return;   /* don't guess mid-string */
+  let tabMatches = [];
+  let tabIndex = -1;
+
+  function resolveCmd(name) {
+    const n = name.toUpperCase();
+    return aliases[n] || n;
+  }
+
+  /* full-line replacements for what is currently typed */
+  function candidates(v) {
     const tokens = v.split(/\s+/);
     const last = tokens[tokens.length - 1];
-
+    const head = tokens.slice(0, -1).join(" ");
     let pool, kind;
+
     if (tokens.length === 1) {
-      pool = Object.keys(commands).concat(Object.keys(aliases));
+      pool = Object.keys(commands).concat(Object.keys(aliases).filter(a => a.length > 1));
       kind = "cmd";
     } else {
       const c = resolveCmd(tokens[0]);
-      const up = last.toUpperCase();
       if (["OPEN", "INFO", "DOWNLOAD", "RELATED"].includes(c)) {
         pool = Archive.visible().map(e => e.id);
         kind = "id";
@@ -146,52 +268,43 @@ const Term = (() => {
       } else if (c === "HELP") {
         pool = Object.keys(commands);
         kind = "cmd";
-      } else return;
+      } else return [];
     }
 
+    if (!last && tokens.length === 1) return [];
     const prefix = last.toUpperCase();
-    const matches = pool.filter(p => p.toUpperCase().startsWith(prefix) && p.toUpperCase() !== prefix);
-    if (!matches.length) {
-      /* nothing more specific - show options anyway when ambiguous */
-      const same = pool.filter(p => p.toUpperCase() === prefix);
-      if (same.length) return;
-      print("NO COMPLETION AVAILABLE.", "dim");
-      return;
-    }
-    if (matches.length === 1) {
-      tokens[tokens.length - 1] = kind === "cmd" ? matches[0].toUpperCase() : matches[0];
-      input.value = tokens.join(" ") + " ";
-      updateCursor();
-      return;
-    }
-    /* common-prefix completion */
-    let cp = matches[0];
-    matches.forEach(m => { while (!m.toUpperCase().startsWith(cp.toUpperCase())) cp = cp.slice(0, -1); });
-    if (cp.length > prefix.length) {
-      tokens[tokens.length - 1] = cp;
-      input.value = tokens.join(" ");
-      updateCursor();
-    }
-    print("POSSIBLE COMPLETIONS: " + matches.slice(0, 12).join("  ") + (matches.length > 12 ? " ..." : ""), "dim");
+    const seen = new Set();
+    return pool
+      .filter(p => p.toUpperCase().startsWith(prefix))
+      .map(p => (kind === "cmd" ? p.toUpperCase() : p))
+      .filter(p => !seen.has(p) && seen.add(p))
+      .sort()
+      .map(p => (head ? head + " " : "") + p + (kind === "cmd" && tokens.length === 1 ? " " : ""));
   }
 
-  /* ---------- cursor mirror ---------- */
+  function updateTabHint() {
+    tabHint.textContent = tabMatches.length > 1 ? "(" + (tabIndex + 1) + "/" + tabMatches.length + ")" : "";
+  }
 
-  function updateCursor() {
+  function resetTab() { tabMatches = []; tabIndex = -1; tabHint.textContent = ""; }
+
+  function complete() {
     const v = input.value;
-    const pos = input.selectionStart ?? v.length;
-    mirror.textContent = v.slice(0, pos);
-    cursorEl.style.left = mirror.offsetWidth + "px";
+    if (tabIndex >= 0 && tabMatches.length && v === tabMatches[tabIndex]) {
+      tabIndex = (tabIndex + 1) % tabMatches.length;      /* cycle */
+    } else {
+      const c = candidates(v);
+      if (!c.length) { Sound.play("error"); return; }
+      tabMatches = c;
+      tabIndex = 0;
+    }
+    input.value = tabMatches[tabIndex];
+    updateTabHint();
   }
 
-  function refocus() { input.focus(); updateCursor(); }
+  function refocus() { input.focus(); }
 
   /* ---------- execute ---------- */
-
-  function resolveCmd(name) {
-    const n = name.toUpperCase();
-    return aliases[n] || n;
-  }
 
   function parseArgs(tokens) {
     const flags = {};
@@ -216,16 +329,26 @@ const Term = (() => {
     liveEntry = "";
 
     const tokens = raw.split(/\s+/);
+
+    /* a lone ID (EV-003) or number (3) opens that record */
+    if (tokens.length === 1 && /^(ev-)?\d+$/i.test(tokens[0])) {
+      const digits = tokens[0].replace(/^ev-/i, "");
+      const id = "EV-" + digits.padStart(3, "0");
+      const ev = Archive.byId(id);
+      if (ev) { Media.open(ev); return; }
+      print("EVIDENCE NOT FOUND: " + id, "err");
+      return;
+    }
+
     const name = resolveCmd(tokens[0]);
     const { flags, args } = parseArgs(tokens.slice(1));
-
     const c = commands[name];
+
     if (!c) {
       const guess = Object.keys(commands).find(k => k.startsWith(name));
       print("UNKNOWN COMMAND: " + tokens[0].toUpperCase(), "err");
       if (guess) print("DID YOU MEAN: " + guess + " ?", "dim");
       print("TYPE HELP FOR COMMAND LIST.", "dim");
-      Sound.blip(180, 0.1);
       return;
     }
     try { c.fn({ args, flags }); }
@@ -235,13 +358,21 @@ const Term = (() => {
   /* ---------- input wiring ---------- */
 
   function onKey(e) {
+    Sound.startAmbience();
+
+    /* any key while text is typing completes it; Enter waits for that */
+    if (busy) {
+      fast = true;
+      if (e.key === "Enter") { e.preventDefault(); return; }
+    }
+
     if (e.key === "Enter") {
       e.preventDefault();
       if (resultsActive && input.value === "" && openSelected()) return;
       const v = input.value;
       input.value = "";
-      updateCursor();
       resetResults();
+      resetTab();
       execute(v);
       return;
     }
@@ -253,7 +384,7 @@ const Term = (() => {
       if (histIdx === -1) histIdx = history.length;
       histIdx = Math.max(0, histIdx - 1);
       input.value = history[histIdx] || "";
-      updateCursor();
+      resetTab();
       return;
     }
     if (e.key === "ArrowDown") {
@@ -262,7 +393,7 @@ const Term = (() => {
       if (histIdx === -1 || !history.length) return;
       histIdx = Math.min(history.length, histIdx + 1);
       input.value = histIdx === history.length ? liveEntry : history[histIdx];
-      updateCursor();
+      resetTab();
       return;
     }
     if (e.key === "Tab") {
@@ -272,15 +403,17 @@ const Term = (() => {
     }
     if (e.key === "Escape") {
       e.preventDefault();
-      if (resultsActive) { resetResults(); }
+      if (resultsActive) resetResults();
       return;
     }
-    /* any real typing deactivates result selection mode */
-    if (e.key.length === 1 && resultsActive) resetResults();
-  }
 
-  ["input", "keyup", "focus", "click", "select"].forEach(ev =>
-    input.addEventListener(ev, updateCursor));
+    /* anything else is typing: click sound, clear completion state */
+    if (e.key.length === 1 || e.key === "Backspace" || e.key === "Delete") {
+      Sound.play("keypress");
+      resetTab();
+      if (resultsActive && e.key.length === 1) resetResults();
+    }
+  }
 
   /* ---------- commands ---------- */
 
@@ -290,28 +423,25 @@ const Term = (() => {
         const n = resolveCmd(args[0]);
         const c = commands[n];
         if (!c) { print("NO HELP ENTRY: " + args[0].toUpperCase(), "err"); return; }
-        print(c.name + (n !== c.name ? " (alias " + n + ")" : ""));
-        print("  " + c.desc, "dim");
-        print("  USAGE: " + c.usage, "dim");
+        Sound.play("success");
+        printBox(c.usage, c.desc);
         return;
       }
-      print("AVAILABLE COMMANDS:", "head");
-      print("  HELP [cmd]    This help, or help for one command");
-      print("  LIST [f]      List archive. f = type or category");
-      print("                flags: /SORT:ID|TITLE|DATE|TYPE /DESC");
-      print("  SEARCH q [in:f]  Search. fields: ID FILE TITLE TYPE");
-      print("                CATEGORY TAGS DATE DESCRIPTION ALL");
-      print("  OPEN id       Open evidence in a viewer window");
-      print("  INFO id       Show evidence details");
-      print("  DOWNLOAD id   Retrieve the raw file");
-      print("  NEXT / PREV   Open next / previous record");
-      print("  RELATED id    List linked evidence");
-      print("  CLEAR         Clear the screen");
-      print("  MAIN          Return to the main site");
-      print("  SOUND ON|OFF  Terminal audio feedback");
-      print("  STATUS        System diagnostics");
-      print("  REBOOT        Replay boot sequence");
-      print("TIP: RESULTS ARE CLICKABLE. ARROWS + ENTER ALSO WORK.", "dim");
+      Sound.play("success");
+      print("AVAILABLE COMMANDS:", "success");
+      printBox("LIST [type|category]", "list the archive. Flags: /SORT:ID|TITLE|DATE|TYPE  /DESC");
+      printBox("SEARCH <words> [in:field]", "search records. Fields: ID FILE TITLE TYPE CATEGORY TAGS DATE DESCRIPTION ALL");
+      printBox("OPEN <id>", "open a record in a viewer window. Typing just the ID (EV-003) or number (3) works too");
+      printBox("INFO <id>", "show a record's details");
+      printBox("DOWNLOAD <id>", "retrieve the raw file");
+      printBox("NEXT / PREV", "open the next or previous record");
+      printBox("RELATED <id>", "list records linked to one");
+      printBox("MUTE / UNMUTE", "silence or restore all sound");
+      printBox("CLEAR", "clear the screen");
+      printBox("MAIN", "return to the main site");
+      printBox("STATUS", "system diagnostics");
+      printBox("REBOOT", "replay the boot sequence");
+      print("Tab completes (press again to cycle) \u00b7 \u2191 \u2193 recalls previous commands \u00b7 ESC closes the front window", "system");
     },
     ["MAN", "?"]);
 
@@ -337,11 +467,12 @@ const Term = (() => {
       const q = args.join(" ");
       if (!q) { print("USAGE: SEARCH <query> [in:FIELD]", "err"); return; }
       const list = Archive.search(q, field);
-      showResults(Archive.sort(list, "id", false), "SEARCH \u2014 \"" + q.toUpperCase() + "\" IN " + field.toUpperCase());
+      const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+      showResults(Archive.sort(list, "id", false), "SEARCH \u2014 \"" + q.toUpperCase() + "\" IN " + field.toUpperCase(), [q.toLowerCase()].concat(words));
     },
     ["FIND", "GREP"]);
 
-  cmd("OPEN", "Open an evidence record.", "OPEN <id>",
+  cmd("OPEN", "Open an evidence record in a viewer window.", "OPEN <id>",
     ({ args }) => {
       if (!args[0]) { print("USAGE: OPEN <ID>   (TAB COMPLETES IDS)", "err"); return; }
       const ev = Archive.byId(args[0]);
@@ -360,31 +491,51 @@ const Term = (() => {
       if (!args[0]) { print("USAGE: INFO <ID>", "err"); return; }
       const ev = Archive.byId(args[0]);
       if (!ev) { print("EVIDENCE NOT FOUND: " + args[0].toUpperCase(), "err"); return; }
-      print("\u2500".repeat(56), "dim");
-      printHTML("<span class='k'>ID:</span>       " + esc(ev.id));
-      print("FILE:      " + (ev.filename || ev.file || "(none)"));
-      print("PATH:      " + (ev.file || "(none)"), "dim");
-      print("TITLE:     " + ev.title);
-      print("TYPE:      " + ev.type.toUpperCase() + (ev.category ? " / " + ev.category.toUpperCase() : ""));
-      print("DATE:      " + (ev.date || "UNKNOWN"));
-      print("SIZE:      " + (ev.size || "UNKNOWN"));
-      print("STATUS:    " + (ev.locked ? "RESTRICTED" : ev.hidden ? "ARCHIVED / INDEX HIDDEN" : "UNRESTRICTED"));
-      if (ev.description) print("NOTES:     " + ev.description, "dim");
-      if (ev.tags.length) print("TAGS:      " + ev.tags.join(", "), "dim");
+
+      const panel = mk("div", "ev-panel");
+      const head = mk("div", "ev-head");
+      head.appendChild(mk("span", "", "RECORD " + ev.id));
+      head.appendChild(mk("span", "", TYPE_TAGS[ev.type] + (ev.category ? " / " + ev.category.toUpperCase() : "")));
+      panel.appendChild(head);
+
+      const kv = (k, v) => {
+        const row = mk("div", "ev-row");
+        row.appendChild(mk("span", "ev-key", k));
+        row.appendChild(mk("span", "ev-val", v));
+        panel.appendChild(row);
+        return row;
+      };
+
+      kv("TITLE", ev.title);
+      kv("FILE", ev.filename || ev.file || "(none)");
+      kv("PATH", ev.file || "(none)");
+      kv("DATE", ev.date || "UNKNOWN");
+      kv("SIZE", ev.size || "UNKNOWN");
+      kv("STATUS", ev.locked ? "RESTRICTED" : ev.hidden ? "ARCHIVED / INDEX HIDDEN" : "UNRESTRICTED");
+      if (ev.description) kv("NOTES", ev.description);
+      if (ev.tags.length) kv("TAGS", ev.tags.join(", "));
+
       if (ev.related.length) {
-        const d = print("RELATED:   ");
+        const row = kv("RELATED", "");
+        const val = row.lastChild;
         ev.related.forEach(rid => {
           const r = Archive.byId(rid);
-          const s = document.createElement("span");
-          s.className = "evlink";
-          s.textContent = rid;
+          const s = mk("span", "evlink", rid);
           s.addEventListener("click", () => { if (r) { resetResults(); Media.open(r); } });
-          d.appendChild(s);
-          d.appendChild(document.createTextNode("  "));
+          val.appendChild(s);
+          val.appendChild(document.createTextNode("  "));
         });
       }
-      if (ev.externalUrl) printHTML("EXTERNAL:  <a class='evlink' href='" + esc(ev.externalUrl) + "' target='_blank' rel='noopener'>" + esc(ev.externalUrl) + "</a>");
-      print("\u2500".repeat(56), "dim");
+
+      if (ev.externalUrl) {
+        const row = kv("EXTERNAL", "");
+        const a = mk("a", "evlink", ev.externalUrl);
+        a.href = ev.externalUrl; a.target = "_blank"; a.rel = "noopener noreferrer";
+        row.lastChild.appendChild(a);
+      }
+
+      printNode(panel);
+      Sound.play("success");
     });
 
   cmd("DOWNLOAD", "Download an evidence file.", "DOWNLOAD <id>",
@@ -400,31 +551,55 @@ const Term = (() => {
     () => {
       if (!Media.lastOpenedId) { print("NO RECORD OPEN. USE OPEN <ID> FIRST.", "err"); return; }
       const n = Archive.neighbors(Media.lastOpenedId).next;
-      if (!n) { print("END OF INDEX. NO FURTHER RECORDS.", "dim"); return; }
+      if (!n) { print("END OF INDEX. NO FURTHER RECORDS.", "warning"); return; }
       Media.open(n);
-    });
+    },
+    ["N"]);
 
   cmd("PREV", "Open the previous record.", "PREV",
     () => {
       if (!Media.lastOpenedId) { print("NO RECORD OPEN. USE OPEN <ID> FIRST.", "err"); return; }
       const p = Archive.neighbors(Media.lastOpenedId).prev;
-      if (!p) { print("START OF INDEX. NO EARLIER RECORDS.", "dim"); return; }
+      if (!p) { print("START OF INDEX. NO EARLIER RECORDS.", "warning"); return; }
       Media.open(p);
     },
-    ["PREVIOUS"]);
+    ["PREVIOUS", "B", "BACK"]);
 
   cmd("RELATED", "List evidence linked to a record.", "RELATED <id>",
     ({ args }) => {
       if (!args[0]) { print("USAGE: RELATED <ID>", "err"); return; }
       const ev = Archive.byId(args[0]);
       if (!ev) { print("EVIDENCE NOT FOUND: " + args[0].toUpperCase(), "err"); return; }
-      if (!ev.related.length) { print("NO LINKED RECORDS FOR " + ev.id + ".", "dim"); return; }
+      if (!ev.related.length) { print("NO LINKED RECORDS FOR " + ev.id + ".", "warning"); return; }
       const list = ev.related.map(r => Archive.byId(r)).filter(Boolean);
-      showResults(list, "RECORDS LINKED TO " + ev.id + ":");
+      showResults(list, "RECORDS LINKED TO " + ev.id);
     },
     ["LINKS"]);
 
-  cmd("CLEAR", "Clear the terminal.", "CLEAR", () => clear(), ["CLS"]);
+  cmd("CLEAR", "Clear the terminal.", "CLEAR", () => clear(), ["CLS", "C"]);
+
+  cmd("MUTE", "Silence all sound.", "MUTE",
+    () => {
+      if (Sound.muted) { print("SOUND ALREADY MUTED", "warning"); return; }
+      Sound.setMuted(true);
+      print("SOUND MUTED", "system");
+    });
+
+  cmd("UNMUTE", "Restore all sound.", "UNMUTE",
+    () => {
+      if (!Sound.muted) { print("SOUND ALREADY UNMUTED", "warning"); return; }
+      Sound.setMuted(false);
+      Sound.play("success");
+      print("SOUND UNMUTED", "success");
+    });
+
+  cmd("SOUND", "Sound on or off.", "SOUND ON|OFF",
+    ({ args }) => {
+      const v = (args[0] || "").toUpperCase();
+      if (v === "ON") { Sound.setMuted(false); Sound.play("success"); print("SOUND UNMUTED", "success"); }
+      else if (v === "OFF") { Sound.setMuted(true); print("SOUND MUTED", "system"); }
+      else print("USAGE: SOUND ON | OFF   (CURRENTLY " + (Sound.muted ? "OFF" : "ON") + ")", "system");
+    });
 
   cmd("MAIN", "Return to the main site.", "MAIN",
     () => {
@@ -435,35 +610,29 @@ const Term = (() => {
     },
     ["HOME", "EXIT"]);
 
-  cmd("SOUND", "Terminal audio feedback.", "SOUND ON|OFF",
-    ({ args }) => {
-      const v = (args[0] || "").toUpperCase();
-      if (v === "ON") { Sound.enabled = true; Sound.blip(660, 0.06); print("SOUND: ON", "ok"); }
-      else if (v === "OFF") { Sound.enabled = false; print("SOUND: OFF", "ok"); }
-      else print("USAGE: SOUND ON | OFF   (CURRENTLY " + (Sound.enabled ? "ON" : "OFF") + ")", "dim");
-    });
+  const bootTime = Date.now();
 
-  cmd("STATUS", "System diagnostics.", "STATUS", () => {
-    const counts = Archive.typeCounts();
-    const uptime = fmtUptime(Date.now() - bootTime);
-    print("SYSTEM DIAGNOSTICS", "head");
-    print("RECORDS:      " + Archive.items.length + " (" + (Archive.items.length - Archive.visible().length) + " HIDDEN)");
-    print("BY TYPE:      " + Object.entries(counts).map(([k, v]) => k.toUpperCase() + " " + v).join(" | "));
-    print("WINDOWS OPEN: " + WinMgr.openCount() + " (" + WinMgr.count() + " TOTAL)");
-    print("MEDIA LOADED: " + Media.stats().loaded + "   ERRORS: " + Media.stats().errors);
-    print("DISPLAY:      " + window.innerWidth + "x" + window.innerHeight + " CRT-9 MONOCHROME");
-    print("UPTIME:       " + uptime);
-    print("INDEX SOURCE: data/evidence.json " + (Archive.loaded ? "[OK]" : "[ERROR: " + Archive.loadError + "]"), Archive.loaded ? "" : "err");
-  });
-
-  cmd("REBOOT", "Replay the boot sequence.", "REBOOT", () => { clear(); Main.bootSequence(); });
-
-  let bootTime = Date.now();
   function fmtUptime(ms) {
     const s = Math.floor(ms / 1000);
     return String(Math.floor(s / 3600)).padStart(2, "0") + ":" +
            String(Math.floor(s / 60) % 60).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
   }
+
+  cmd("STATUS", "System diagnostics.", "STATUS", () => {
+    const counts = Archive.typeCounts();
+    Sound.play("success");
+    print("SYSTEM DIAGNOSTICS", "success");
+    print("RECORDS:      " + Archive.items.length + " (" + (Archive.items.length - Archive.visible().length) + " HIDDEN)");
+    print("BY TYPE:      " + Object.entries(counts).map(([k, v]) => k.toUpperCase() + " " + v).join(" | "));
+    print("WINDOWS OPEN: " + WinMgr.openCount() + " (" + WinMgr.count() + " TOTAL)");
+    print("MEDIA LOADED: " + Media.stats().loaded + "   ERRORS: " + Media.stats().errors);
+    print("SOUND:        " + (Sound.muted ? "MUTED" : "ON"));
+    print("DISPLAY:      " + window.innerWidth + "x" + window.innerHeight);
+    print("UPTIME:       " + fmtUptime(Date.now() - bootTime));
+    print("INDEX SOURCE: data/evidence.json " + (Archive.loaded ? "[OK]" : "[ERROR: " + Archive.loadError + "]"), Archive.loaded ? "" : "err");
+  });
+
+  cmd("REBOOT", "Replay the boot sequence.", "REBOOT", () => { clear(); Main.bootSequence(); });
 
   function init() {
     promptEl.textContent = Archive.config.prompt || "D9>";
@@ -471,6 +640,10 @@ const Term = (() => {
     refocus();
   }
 
-  return { print, printHTML, echo, clear, execute, init, refocus, resetResults,
-           get resultsActive() { return resultsActive; }, bootTime };
+  return {
+    print, printHTML, printNode, printBox, echo, clear, execute, init, refocus,
+    resetResults, progress, whenIdle, skipTyping,
+    get resultsActive() { return resultsActive; },
+    bootTime
+  };
 })();
