@@ -1,299 +1,854 @@
-/* ============================================================
-   DIVISION 9 // EVIDENCE ARCHIVE - CRT/DOS stylesheet
-   Palette is driven by the variables below - adjust :root to
-   match the main Division 9 site.
-   ============================================================ */
+/* ===========================================================
+   BSLSK DIVISION-9 EVIDENCE ARCHIVE
+   css/style.css
 
-:root {
-  --crt-bg:      #020a04;
-  --crt-green:   #2bd96a;
-  --crt-dim:     #17a349;
-  --crt-dark:    #0a5c2a;
-  --crt-inverse: #021006;
-  --glow:        0 0 4px rgba(43, 217, 106, .55), 0 0 12px rgba(43, 217, 106, .25);
-  --font-mono:   "IBM VGA", "Courier New", "Lucida Console", "Consolas", monospace;
+   Same design language as the main terminal: shared colour
+   variables, framed terminal box, centred header, CRT overlay
+   with moving scanline sweep, bordered help boxes, highlighted
+   search matches, blinking cursor, idle banner.
+
+   The archive's own parts (evidence windows, taskbar, status
+   bar, result panels) are restyled in that same language.
+   =========================================================== */
+
+:root{
+    --bg:#020503;
+    --panel:#07110b;
+    --green:#00ff66;
+    --green-rgb:0,255,102;
+    --green-dim:#00bb55;
+    --white:#eaffef;
+    --red:#ff5555;
+    --blue:#55cfff;
+    --yellow:#ffe066;
+    --border:rgba(0,255,100,.35);
 }
 
-* { box-sizing: border-box; }
-
-html, body {
-  margin: 0; padding: 0;
-  height: 100%;
-  background: var(--crt-bg);
-  color: var(--crt-green);
-  font-family: var(--font-mono);
-  font-size: 15px;
-  overflow: hidden;
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
 }
 
-::selection { background: var(--crt-green); color: var(--crt-inverse); }
-
-/* ---------- atmosphere ---------- */
-
-#scanlines {
-  position: fixed; inset: 0; z-index: 9000;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
-    rgba(0,0,0,.18) 3px, rgba(0,0,0,.18) 4px
-  );
-  mix-blend-mode: multiply;
+html,
+body{
+    width:100%;
+    height:100%;
 }
 
-#crt-overlay {
-  position: fixed; inset: 0; z-index: 9001;
-  pointer-events: none;
-  background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.35) 100%);
-  animation: flicker 4s infinite steps(1);
+body{
+    background:var(--bg);
+    color:var(--green);
+    font-family:"Courier New", monospace;
+    overflow:hidden;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    text-shadow:0 0 6px rgba(var(--green-rgb),.45);
 }
 
-@keyframes flicker {
-  0%, 100% { opacity: 1; }
-  31%      { opacity: .97; }
-  32%      { opacity: 1; }
-  73%      { opacity: .98; }
-  74%      { opacity: 1; }
+::selection{
+    background:var(--green);
+    color:var(--bg);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  #crt-overlay { animation: none; }
-  #cursor { animation: none !important; }
-  .blink, .load-dots { animation: none !important; }
+/* ===========================================================
+   Background glow + CRT overlay
+   =========================================================== */
+
+body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    background:
+        radial-gradient(circle at center,
+        rgba(var(--green-rgb),.08),
+        transparent 65%);
+    pointer-events:none;
+    z-index:0;
 }
 
-/* ---------- app frame ---------- */
+#crt-overlay{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:9000;
 
-#app {
-  position: fixed; inset: 0;
-  display: flex; flex-direction: column;
-  text-shadow: var(--glow);
-  z-index: 1;
+    background:
+        repeating-linear-gradient(
+            180deg,
+            rgba(255,255,255,.02) 0px,
+            rgba(255,255,255,.02) 2px,
+            transparent 2px,
+            transparent 4px
+        );
+
+    animation:flicker .12s infinite;
 }
 
-#topbar, #statusbar, #taskbar {
-  flex: 0 0 auto;
-  padding: 4px 10px;
-  background: var(--crt-inverse);
-  border: 1px solid var(--crt-dark);
-  display: flex; justify-content: space-between; gap: 10px;
-  white-space: nowrap; overflow: hidden;
-  user-select: none;
+@keyframes flicker{
+    0%{opacity:.96;}
+    25%{opacity:.99;}
+    50%{opacity:.95;}
+    75%{opacity:.98;}
+    100%{opacity:.97;}
 }
 
-#topbar { border-width: 0 0 2px 0; font-weight: bold; letter-spacing: 1px; }
-#sys-status { color: var(--crt-dim); font-weight: normal; }
-
-#statusbar { border-width: 2px 0 0 0; color: var(--crt-dim); }
-#status-open { overflow: hidden; text-overflow: ellipsis; }
-
-#taskbar { border-width: 1px 0; min-height: 28px; align-items: center; }
-#task-label { color: var(--crt-dim); }
-#task-items { display: flex; gap: 8px; flex-wrap: wrap; }
-#task-empty { color: var(--crt-dark); }
-
-.task-item {
-  border: 1px solid var(--crt-dim);
-  padding: 1px 8px; cursor: pointer;
-  color: var(--crt-green);
-  background: transparent;
-  font-family: var(--font-mono); font-size: 13px;
-}
-.task-item:hover { background: var(--crt-dim); color: var(--crt-inverse); }
-
-#desktop { position: relative; flex: 1 1 auto; overflow: hidden; }
-
-/* ---------- terminal ---------- */
-
-#terminal-panel {
-  position: absolute; inset: 0;
-  padding: 10px 12px 20px;
-  overflow: hidden;
+@keyframes blink{
+    0%{opacity:1;}
+    50%{opacity:0;}
+    100%{opacity:1;}
 }
 
-#terminal-output {
-  height: calc(100% - 34px);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--crt-dark) transparent;
-  white-space: pre-wrap;
-  word-break: break-word;
-  line-height: 1.35;
-}
-#terminal-output::-webkit-scrollbar { width: 8px; }
-#terminal-output::-webkit-scrollbar-thumb { background: var(--crt-dark); }
-
-.line { min-height: 1.2em; }
-.echo   { color: var(--crt-green); }
-.dim    { color: var(--crt-dim); }
-.err    { color: var(--crt-green); background: rgba(217,43,43,.18); }
-.ok     { color: var(--crt-green); }
-.hl     { color: var(--crt-inverse); background: var(--crt-dim); padding: 0 2px; }
-.head   { border-bottom: 1px solid var(--crt-dark); padding-bottom: 2px; margin: 4px 0 2px; }
-
-.result-line { cursor: pointer; }
-.result-line:hover { background: var(--crt-dark); }
-.result-line.sel { background: var(--crt-dim); color: var(--crt-inverse); text-shadow: none; }
-.result-line.sel .rmeta { color: var(--crt-inverse); }
-
-.rmeta { color: var(--crt-dim); }
-.evlink { cursor: pointer; text-decoration: underline; }
-.evlink:hover { color: var(--crt-inverse); background: var(--crt-dim); text-shadow: none; }
-
-.blink { animation: blink 1s infinite steps(1); }
-@keyframes blink { 50% { opacity: 0; } }
-
-/* ---------- input line ---------- */
-
-#terminal-input-wrap {
-  display: flex; align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  white-space: nowrap;
+@media (prefers-reduced-motion: reduce){
+    #crt-overlay{ animation:none; }
+    .cursor{ animation:none !important; }
+    .blink, .load-dots::after{ animation:none !important; }
+    #scanline-overlay::before{ animation:none !important; }
 }
 
-#prompt { color: var(--crt-green); user-select: none; }
+/* ===========================================================
+   Terminal frame (same box as the main site)
+   =========================================================== */
 
-#input-box { position: relative; flex: 1; min-width: 60px; }
+#app{
 
-#mirror {
-  position: absolute; left: 0; top: 0;
-  visibility: hidden; white-space: pre;
+    position:relative;
+
+    width:min(1300px,95vw);
+    height:92vh;
+
+    border:2px solid var(--green);
+
+    background:rgba(2,8,5,.94);
+
+    box-shadow:
+        0 0 25px rgba(var(--green-rgb),.25),
+        inset 0 0 35px rgba(var(--green-rgb),.08);
+
+    display:flex;
+    flex-direction:column;
+
+    overflow:hidden;
+
+    z-index:2;
+
 }
 
-#cmdline {
-  position: absolute; left: 0; top: 0;
-  width: 100%;
-  background: transparent; border: none; outline: none;
-  color: var(--crt-green);
-  font-family: var(--font-mono); font-size: 15px;
-  padding: 0; margin: 0;
-  caret-color: transparent;
-  text-shadow: var(--glow);
+html.ready #app{
+    animation:app-in .6s ease both;
 }
 
-#cursor {
-  position: absolute; top: 0; left: 0;
-  color: var(--crt-green); text-shadow: var(--glow);
-  animation: blink 1s infinite steps(1);
-  pointer-events: none;
+@keyframes app-in{
+    from{ opacity:0; }
+    to{   opacity:1; }
 }
 
-/* ---------- windows ---------- */
+/* Moving green sweep, clipped to the box */
 
-.d9-window {
-  position: absolute;
-  background: rgba(2, 12, 5, .96);
-  border: 2px solid var(--crt-green);
-  box-shadow: 0 0 12px rgba(43, 217, 106, .35), inset 0 0 30px rgba(43, 217, 106, .05);
-  display: flex; flex-direction: column;
-  min-width: 220px; min-height: 120px;
-  text-shadow: none;
+#scanline-overlay{
+    position:absolute;
+    inset:0;
+    overflow:hidden;
+    pointer-events:none;
+    z-index:998;
+    mix-blend-mode:screen;
 }
 
-.d9-window.focused { border-color: var(--crt-green); }
-.d9-window:not(.focused) { border-color: var(--crt-dim); opacity: .96; }
+#scanline-overlay::before{
+    content:"";
+    position:absolute;
+    left:0;
+    right:0;
+    height:140px;
 
-.win-header {
-  flex: 0 0 auto;
-  display: flex; justify-content: space-between; align-items: center;
-  background: var(--crt-green); color: var(--crt-inverse);
-  user-select: none;
-  cursor: move;
-  touch-action: none;
-  padding: 0 0 0 8px;
-  font-size: 13px;
-}
-.d9-window:not(.focused) .win-header { background: var(--crt-dim); }
+    background:linear-gradient(
+        180deg,
+        rgba(var(--green-rgb),0)    0%,
+        rgba(var(--green-rgb),.05) 35%,
+        rgba(var(--green-rgb),.16) 50%,
+        rgba(var(--green-rgb),.05) 65%,
+        rgba(var(--green-rgb),0)  100%
+    );
 
-.win-title {
-  flex: 1; min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  letter-spacing: .5px;
+    animation:scan-sweep 6s linear infinite;
 }
 
-.win-btns { display: flex; }
-.win-btns button {
-  font-family: var(--font-mono); font-size: 13px;
-  background: transparent; color: var(--crt-inverse);
-  border: none; border-left: 2px solid var(--crt-inverse);
-  padding: 2px 10px; cursor: pointer;
-}
-.win-btns button:hover { background: var(--crt-inverse); color: var(--crt-green); }
-
-.win-body {
-  flex: 1 1 auto; overflow: auto;
-  padding: 8px;
-  position: relative;
-  scrollbar-width: thin;
-  scrollbar-color: var(--crt-dark) transparent;
-  color: var(--crt-green);
+@keyframes scan-sweep{
+    0%  { transform:translateY(-140px); }
+    100%{ transform:translateY(100vh); }
 }
 
-.win-footer {
-  flex: 0 0 auto;
-  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
-  border-top: 1px solid var(--crt-dark);
-  padding: 4px 8px;
-  font-size: 13px; color: var(--crt-dim);
+/* ===========================================================
+   Header (identical to the main terminal)
+   =========================================================== */
+
+#terminal-header{
+
+    display:flex;
+    justify-content:center;
+    gap:18px;
+
+    padding:14px;
+
+    border-bottom:1px solid var(--border);
+
+    background:rgba(var(--green-rgb),.05);
+
+    font-weight:bold;
+
+    letter-spacing:2px;
+
 }
 
-.wbtn {
-  font-family: var(--font-mono); font-size: 13px;
-  background: transparent; color: var(--crt-green);
-  border: 1px solid var(--crt-dim);
-  padding: 1px 8px; cursor: pointer;
-}
-.wbtn:hover { background: var(--crt-dim); color: var(--crt-inverse); }
-.wbtn.on { background: var(--crt-green); color: var(--crt-inverse); }
+.divider{ opacity:.4; }
 
-/* ---------- media viewers ---------- */
+#sys-status{ color:var(--red); }
 
-.viewer { display: flex; flex-direction: column; gap: 8px; width: 100%; height: 100%; }
-.viewer img, .viewer video {
-  max-width: 100%; max-height: 100%;
-  display: block; margin: 0 auto;
-  border: 1px solid var(--crt-dark);
-  image-rendering: auto;
-}
-.viewer img { object-fit: contain; }
+/* ===========================================================
+   Desktop: terminal output + evidence windows
+   =========================================================== */
 
-.viewer .media-box {
-  flex: 1 1 auto; min-height: 0;
-  display: flex; align-items: center; justify-content: center;
-  overflow: auto;
+#desktop{
+    position:relative;
+    flex:1 1 auto;
+    min-height:0;
+    overflow:hidden;
 }
 
-.viewer audio { width: 100%; }
-
-.load-ov {
-  position: absolute; inset: 0; z-index: 5;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(2, 10, 4, .92);
-  letter-spacing: 2px;
+#terminal-panel{
+    position:absolute;
+    inset:0;
 }
 
-.load-dots::after { content: ""; animation: dots 1s infinite steps(4); }
-@keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+#terminal-output{
 
-.err-box {
-  border: 1px solid var(--crt-green);
-  background: rgba(217, 43, 43, .12);
-  padding: 10px;
-  color: var(--crt-green);
-  white-space: pre-wrap;
+    position:absolute;
+    inset:0;
+
+    overflow-y:auto;
+
+    padding:22px;
+
+    white-space:pre-wrap;
+    word-break:break-word;
+
+    line-height:1.55;
+
+    scrollbar-width:thin;
+
 }
 
-.info-grid { line-height: 1.6; }
-.info-grid .k { color: var(--crt-dim); display: inline-block; min-width: 11ch; }
+#terminal-output::-webkit-scrollbar{ width:10px; }
+#terminal-output::-webkit-scrollbar-thumb{ background:rgba(var(--green-rgb),.2); }
 
-.doc-frame { width: 100%; height: 100%; border: 1px solid var(--crt-dark); background: #fff; color: #111; }
+.line{ min-height:1.2em; }
 
-/* ---------- responsive ---------- */
+/* ===========================================================
+   Colour classes (main site names + the archive's older ones)
+   =========================================================== */
 
-@media (max-width: 640px) {
-  body { font-size: 13px; }
-  #cmdline, #cursor { font-size: 13px; }
-  .d9-window { min-width: 180px; }
-  #task-label { display: none; }
+.success, .ok{ color:var(--blue); }
+
+.error, .err{ color:var(--red); }
+
+.warning{ color:var(--yellow); }
+
+.system, .dim{ color:#8affb4; opacity:.75; }
+
+.boot{
+    color:#8dffbd;
+    opacity:.85;
+    margin-bottom:4px;
+}
+
+.echo{ color:var(--white); }
+
+.head{
+    font-weight:bold;
+    letter-spacing:1px;
+    border-bottom:1px solid var(--border);
+    padding-bottom:2px;
+    margin:6px 0 4px;
+}
+
+.blink{ animation:blink 1s infinite steps(1); }
+
+/* Search highlight - reverse video, same as the main terminal */
+.hl{
+    background:var(--green);
+    color:var(--bg);
+    padding:0 2px;
+    border-radius:2px;
+    text-shadow:none;
+}
+
+.evlink{
+    cursor:pointer;
+    text-decoration:underline;
+    color:var(--green);
+}
+.evlink:hover{
+    background:var(--green);
+    color:var(--bg);
+    text-shadow:none;
+}
+
+/* ===========================================================
+   Help boxes (same look as the main terminal's help)
+   =========================================================== */
+
+.help-entry{
+    border:1px solid var(--border);
+    background:rgba(var(--green-rgb),.04);
+    padding:8px 12px;
+    margin:6px 0;
+    animation:help-fade-in .15s ease;
+}
+
+.help-entry-title{
+    font-weight:bold;
+    color:var(--green);
+    letter-spacing:1px;
+}
+
+.help-entry-desc{
+    margin-top:4px;
+    font-size:.82em;
+    opacity:.7;
+}
+
+@keyframes help-fade-in{
+    from{ opacity:0; transform:translateY(-2px); }
+    to{   opacity:1; transform:translateY(0); }
+}
+
+/* ===========================================================
+   Result + info panels
+   =========================================================== */
+
+.ev-panel{
+    border:1px solid var(--border);
+    background:rgba(var(--green-rgb),.04);
+    margin:8px 0 12px;
+    max-width:760px;
+    white-space:normal;
+    line-height:1.4;
+    animation:help-fade-in .15s ease;
+}
+
+.ev-head{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    padding:6px 12px;
+    border-bottom:1px solid var(--border);
+    background:rgba(var(--green-rgb),.1);
+    font-size:.78em;
+    font-weight:bold;
+    letter-spacing:2px;
+}
+
+.ev-head span:last-child{
+    opacity:.65;
+    font-weight:normal;
+    letter-spacing:1px;
+    text-align:right;
+}
+
+.ev-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:5px 12px;
+    font-size:.88em;
+}
+
+.ev-row + .ev-row{
+    border-top:1px solid rgba(var(--green-rgb),.1);
+}
+
+.result-line{ cursor:pointer; }
+
+.result-line:hover{ background:rgba(var(--green-rgb),.1); }
+
+.result-line.sel{
+    background:var(--green);
+    color:var(--bg);
+    text-shadow:none;
+}
+.result-line.sel .rmeta,
+.result-line.sel .r-id{ color:var(--bg); opacity:.8; }
+
+.r-id{
+    flex:0 0 7ch;
+    letter-spacing:1px;
+    font-weight:bold;
+}
+
+.r-title{
+    flex:1;
+    min-width:0;
+    overflow-wrap:anywhere;
+}
+
+.rmeta,
+.r-date,
+.r-file{
+    font-size:.78em;
+    opacity:.55;
+    letter-spacing:1px;
+    white-space:nowrap;
+}
+
+.r-file{
+    max-width:22ch;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.ev-badge{
+    flex-shrink:0;
+    width:4ch;
+    text-align:center;
+    font-size:.7em;
+    font-weight:bold;
+    letter-spacing:1px;
+    border:1px solid var(--border);
+    padding:1px 0;
+}
+.ev-badge.t-video{    color:var(--blue);   border-color:rgba(85,207,255,.45); }
+.ev-badge.t-audio{    color:var(--yellow); border-color:rgba(255,224,102,.45); }
+.ev-badge.t-gif{      color:#ff9de2;       border-color:rgba(255,157,226,.45); }
+.ev-badge.t-document{ color:#8affb4; }
+.ev-badge.t-link{     color:var(--red);    border-color:rgba(255,85,85,.45); }
+
+.ev-key{
+    flex:0 0 12ch;
+    font-size:.8em;
+    letter-spacing:1px;
+    opacity:.6;
+}
+
+.ev-val{
+    flex:1;
+    min-width:0;
+    overflow-wrap:anywhere;
+}
+
+/* ===========================================================
+   Task bar + status bar
+   =========================================================== */
+
+#taskbar,
+#statusbar{
+    flex:0 0 auto;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    padding:5px 18px;
+    border-top:1px solid var(--border);
+    font-size:12px;
+    letter-spacing:1px;
+    white-space:nowrap;
+    overflow:hidden;
+    user-select:none;
+}
+
+#taskbar{
+    background:rgba(var(--green-rgb),.03);
+    justify-content:flex-start;
+    min-height:30px;
+}
+
+#statusbar{
+    background:rgba(var(--green-rgb),.05);
+    opacity:.85;
+}
+
+#task-label{ opacity:.55; }
+#task-items{ display:flex; gap:8px; flex-wrap:wrap; }
+#task-empty{ opacity:.35; }
+#status-open{ overflow:hidden; text-overflow:ellipsis; }
+
+.task-item{
+    font-family:inherit;
+    font-size:12px;
+    letter-spacing:1px;
+    color:var(--green);
+    background:transparent;
+    border:1px solid var(--border);
+    padding:1px 8px;
+    cursor:pointer;
+    text-shadow:inherit;
+}
+.task-item:hover{
+    background:var(--green);
+    color:var(--bg);
+    text-shadow:none;
+}
+
+/* ===========================================================
+   Input (identical layout to the main terminal)
+   =========================================================== */
+
+#terminal-input{
+
+    display:flex;
+    align-items:center;
+    gap:12px;
+
+    padding:18px;
+
+    border-top:1px solid var(--border);
+
+    background:rgba(var(--green-rgb),.03);
+
+}
+
+#prompt{
+    font-weight:bold;
+    color:var(--green);
+    user-select:none;
+}
+
+#cmdline{
+
+    flex:1;
+    min-width:0;
+
+    background:none;
+    border:none;
+    outline:none;
+
+    color:var(--white);
+
+    font-family:inherit;
+    font-size:17px;
+
+    caret-color:var(--green);
+
+    text-shadow:0 0 8px var(--green);
+
+}
+
+.cursor{
+    display:inline-block;
+    width:9px;
+    height:1em;
+    background:var(--green);
+    margin-left:3px;
+    animation:blink .9s infinite;
+}
+
+#tab-hint{
+    font-size:.8em;
+    opacity:.55;
+    margin-left:8px;
+    white-space:nowrap;
+    flex-shrink:0;
+}
+
+/* ===========================================================
+   Evidence windows (restyled in the same language)
+   =========================================================== */
+
+.d9-window{
+
+    position:absolute;
+
+    background:rgba(2,10,5,.97);
+
+    border:2px solid var(--green);
+
+    box-shadow:
+        0 0 18px rgba(var(--green-rgb),.3),
+        inset 0 0 30px rgba(var(--green-rgb),.05);
+
+    display:flex;
+    flex-direction:column;
+
+    min-width:220px;
+    min-height:120px;
+
+    text-shadow:none;
+
+}
+
+.d9-window:not(.focused){
+    border-color:var(--border);
+    box-shadow:0 0 8px rgba(var(--green-rgb),.12);
+}
+
+.win-header{
+
+    flex:0 0 auto;
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+    background:rgba(var(--green-rgb),.1);
+    border-bottom:1px solid var(--border);
+
+    font-size:13px;
+    font-weight:bold;
+    letter-spacing:1px;
+
+    padding:0 0 0 10px;
+
+    user-select:none;
+    cursor:move;
+    touch-action:none;
+
+}
+
+.d9-window.focused .win-header{ background:rgba(var(--green-rgb),.22); }
+
+.win-title{
+    flex:1;
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    padding:6px 0;
+}
+
+.win-btns{ display:flex; }
+
+.win-btns button{
+    font-family:inherit;
+    font-size:13px;
+    font-weight:bold;
+    background:transparent;
+    color:var(--green);
+    border:none;
+    border-left:1px solid var(--border);
+    padding:6px 12px;
+    cursor:pointer;
+    text-shadow:none;
+}
+
+.win-btns button:hover{
+    background:var(--green);
+    color:var(--bg);
+}
+
+.win-body{
+    flex:1 1 auto;
+    overflow:auto;
+    padding:10px;
+    position:relative;
+    scrollbar-width:thin;
+    color:var(--green);
+}
+
+.win-footer{
+    flex:0 0 auto;
+    display:flex;
+    gap:6px;
+    align-items:center;
+    flex-wrap:wrap;
+    border-top:1px solid var(--border);
+    padding:6px 10px;
+    font-size:12px;
+    letter-spacing:1px;
+    opacity:.9;
+}
+
+.footer-time{ opacity:.7; }
+
+.wbtn{
+    font-family:inherit;
+    font-size:12px;
+    font-weight:bold;
+    letter-spacing:1px;
+    background:transparent;
+    color:var(--green);
+    border:1px solid var(--green);
+    padding:3px 10px;
+    cursor:pointer;
+    text-decoration:none;
+    text-shadow:none;
+    display:inline-block;
+}
+.wbtn:hover{ background:var(--green); color:var(--bg); }
+.wbtn.on{ background:var(--green); color:var(--bg); }
+
+/* media viewers */
+
+.viewer{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    width:100%;
+    height:100%;
+}
+
+.viewer img,
+.viewer video{
+    max-width:100%;
+    max-height:100%;
+    display:block;
+    margin:0 auto;
+    border:1px solid var(--border);
+}
+
+.viewer img{ object-fit:contain; }
+
+.viewer .media-box{
+    flex:1 1 auto;
+    min-height:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:auto;
+}
+
+.viewer audio{ width:100%; }
+
+.load-ov{
+    position:absolute;
+    inset:0;
+    z-index:5;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(2,8,5,.94);
+    letter-spacing:3px;
+    font-size:13px;
+}
+
+.load-dots::after{
+    content:"";
+    animation:dots 1s infinite steps(4);
+}
+
+@keyframes dots{
+    0%{ content:""; }
+    25%{ content:"."; }
+    50%{ content:".."; }
+    75%{ content:"..."; }
+}
+
+.err-box{
+    border:1px solid var(--red);
+    background:rgba(255,85,85,.1);
+    padding:12px;
+    color:var(--red);
+    white-space:pre-wrap;
+    font-size:13px;
+    line-height:1.5;
+}
+
+.doc-frame{
+    width:100%;
+    height:100%;
+    border:1px solid var(--border);
+    background:#fff;
+    color:#111;
+}
+
+/* ===========================================================
+   Idle banner (same as the main terminal)
+   =========================================================== */
+
+#idle-banner{
+    position:fixed;
+    overflow:hidden;
+    z-index:9500;
+    pointer-events:none;
+    opacity:0;
+    transition:opacity 1.2s ease;
+    background:rgba(2,5,3,.97);
+}
+
+#idle-banner.visible{ opacity:1; }
+
+#idle-banner-text{
+    position:absolute;
+    top:0;
+    left:0;
+    margin:0;
+    font-family:"Courier New", monospace;
+    font-weight:bold;
+    font-size:clamp(12px, 3vw, 34px);
+    line-height:1.15;
+    white-space:pre;
+    letter-spacing:2px;
+    color:var(--green);
+    text-shadow:
+        0 0 12px var(--green),
+        0 0 28px var(--green),
+        0 0 55px var(--green);
+    will-change:transform;
+}
+
+/* ===========================================================
+   Responsive - phones
+   Box fills the screen; sizes trimmed to match. The input stays
+   16px+ (iOS zooms the page on focus for anything smaller).
+   =========================================================== */
+
+@media (max-width:700px){
+
+    #app{
+        width:100vw;
+        height:100vh;
+        height:100dvh;
+        border-width:1px;
+        box-shadow:none;
+    }
+
+    #terminal-header{
+        flex-wrap:wrap;
+        gap:8px;
+        padding:10px;
+        font-size:11px;
+        letter-spacing:1px;
+    }
+
+    #terminal-output{
+        padding:14px;
+        font-size:14px;
+        line-height:1.45;
+    }
+
+    #terminal-input{
+        padding:12px;
+        gap:8px;
+    }
+
+    #cmdline{ font-size:16px; }
+
+    #tab-hint{ font-size:.75em; margin-left:6px; }
+
+    #taskbar,
+    #statusbar{ padding:4px 12px; font-size:11px; }
+
+    #task-label{ display:none; }
+
+    .ev-panel{ max-width:none; }
+
+    .ev-key{ flex-basis:10ch; }
+
+    .r-date,
+    .r-file{ display:none; }
+
+    .d9-window{ min-width:180px; }
+
+    #idle-banner-text{
+        letter-spacing:0;
+        line-height:1;
+        text-shadow:0 0 5px var(--green);
+        backface-visibility:hidden;
+    }
+
+}
+
+@media (max-width:420px){
+
+    .divider{ display:none; }
+
 }
