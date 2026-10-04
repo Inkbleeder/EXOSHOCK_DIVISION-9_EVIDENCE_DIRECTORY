@@ -2,7 +2,7 @@
 /* media.js - evidence viewers/players inside windows. */
 
 const Media = (() => {
-  let lastOpenedId = null;
+  let lastOpenedKey = null;
   let errorCount = 0;
   let loadedCount = 0;
 
@@ -17,10 +17,10 @@ const Media = (() => {
   function updateStatusLine() {
     const f = WinMgr.focused;
     if (f && f.evidenceId) {
-      const ev = Archive.byId(f.evidenceId);
-      statusOpen.textContent = "OPEN: " + f.evidenceId + (ev ? " \u2014 " + ev.title.toUpperCase() : "");
+      const ev = Archive.byKey(f.evidenceId);
+      statusOpen.textContent = "OPEN: " + (ev ? ev.title.toUpperCase() : f.title);
     } else {
-      statusOpen.textContent = lastOpenedId ? "LAST OPEN: " + lastOpenedId : "NO FILE OPEN";
+      statusOpen.textContent = lastOpenedKey ? "LAST OPEN: " + (Archive.byKey(lastOpenedKey) || {title:""}).title.toUpperCase() : "NO FILE OPEN";
     }
   }
 
@@ -37,7 +37,7 @@ const Media = (() => {
     d.className = "err-box";
     d.textContent = "ERROR: FILE NOT FOUND OR CORRUPTED\r\nPATH: " + (ev.file || "(none)") +
                      "\r\n\r\nThe record exists in the index, but the file could not be read. " +
-                     "Contact the archive administrator.";
+                     "Report this to the archive administrator.";
     return d;
   }
 
@@ -58,16 +58,16 @@ const Media = (() => {
     spacer.style.flex = "1";
     bar.appendChild(spacer);
 
-    if (Archive.neighbors(ev.id).prev) {
+    if (Archive.neighbors(ev.key).prev) {
       const b = document.createElement("button");
       b.className = "wbtn"; b.textContent = "<<PREV";
-      b.addEventListener("click", () => openById(Archive.neighbors(ev.id).prev.id));
+      b.addEventListener("click", () => open(Archive.neighbors(ev.key).prev));
       bar.appendChild(b);
     }
-    if (Archive.neighbors(ev.id).next) {
+    if (Archive.neighbors(ev.key).next) {
       const b = document.createElement("button");
       b.className = "wbtn"; b.textContent = "NEXT>>";
-      b.addEventListener("click", () => openById(Archive.neighbors(ev.id).next.id));
+      b.addEventListener("click", () => open(Archive.neighbors(ev.key).next));
       bar.appendChild(b);
     }
     return { bar, time };
@@ -187,16 +187,16 @@ const Media = (() => {
   function open(ev) {
     if (!ev) return;
     if (ev.locked) {
-      Term.print("ACCESS RESTRICTED: " + ev.id + " REQUIRES CLEARANCE. RECORD SEALED BY ADMINISTRATOR.", "err");
+      Term.print("ACCESS RESTRICTED: " + ev.title.toUpperCase() + " REQUIRES CLEARANCE. RECORD SEALED BY ADMINISTRATOR.", "err");
       Sound.blip(180, 0.12);
       return;
     }
-    const existing = WinMgr.findEvidence(ev.id);
-    if (existing) { WinMgr.restore(existing); lastOpenedId = ev.id; updateStatusLine(); return; }
+    const existing = WinMgr.findEvidence(ev.key);
+    if (existing) { WinMgr.restore(existing); lastOpenedKey = ev.key; updateStatusLine(); return; }
 
     const wrap = document.createElement("div");
     wrap.className = "viewer";
-    const overlay = loadingOverlay("LOADING " + ev.id);
+    const overlay = loadingOverlay("LOADING");
     wrap.appendChild(overlay);
 
     const builder = BUILDERS[ev.type] || imageViewer;
@@ -207,12 +207,13 @@ const Media = (() => {
 
     const size = DEFAULT_SIZE[ev.type] || DEFAULT_SIZE.image;
     const win = WinMgr.create({
-      title: ev.id + " \u2014 " + ev.title.toUpperCase(),
+      title: ev.title.toUpperCase(),
       content: wrap,
-      evidenceId: ev.id,
-      tag: "ev-" + ev.id,
+      evidenceId: ev.key,
+      label: ev.title,
+      tag: "ev-" + ev.key,
       w: size.w, h: size.h,
-      onClose: () => { lastOpenedId = ev.id; }
+      onClose: () => { lastOpenedKey = ev.key; }
     });
 
     /* wrap the overlay so it covers the window body */
@@ -235,24 +236,17 @@ const Media = (() => {
       bar.appendChild(b);
     }
 
-    lastOpenedId = ev.id;
+    lastOpenedKey = ev.key;
     updateStatusLine();
     if (ev.forceDownload && ev.file) download(ev);
     return win;
-  }
-
-  function openById(id) {
-    const ev = Archive.byId(id);
-    if (ev) open(ev);
-    else Term.print("EVIDENCE NOT FOUND: " + id, "err");
-    return ev;
   }
 
   /* ---------- download ---------- */
 
   function download(ev) {
     if (!ev.file) {
-      Term.print("NO FILE ATTACHED TO RECORD " + ev.id + ".", "err");
+      Term.print("NO FILE ATTACHED TO THIS RECORD.", "err");
       return false;
     }
     if (ev.externalUrl && !ev.file) { window.open(ev.externalUrl, "_blank", "noopener"); return true; }
@@ -277,8 +271,8 @@ const Media = (() => {
   }
 
   return {
-    open, openById, download, updateStatusLine, fmtTime,
-    get lastOpenedId() { return lastOpenedId; },
+    open, download, updateStatusLine, fmtTime,
+    get lastOpenedKey() { return lastOpenedKey; },
     stats() { return { errors: errorCount, loaded: loadedCount }; }
   };
 })();
