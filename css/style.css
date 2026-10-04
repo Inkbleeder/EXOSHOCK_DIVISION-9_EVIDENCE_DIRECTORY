@@ -1012,3 +1012,31 @@ html.ready #app.glitch{
     opacity:.6;
     white-space:nowrap;
 }
+
+/* ---- category / subcategory headings in LIST ---- */
+.ev-cat{
+    padding:6px 12px 4px;
+    font-weight:bold;
+    letter-spacing:2px;
+    font-size:.88em;
+    border-top:1px solid var(--border);
+    background:rgba(var(--green-rgb),.07);
+}
+.ev-head + .ev-cat{ border-top:0; }
+.ev-sub{
+    padding:4px 12px 2px 20px;
+    font-size:.76em;
+    letter-spacing:2px;
+    opacity:.6;
+}
+.ev-sub + .ev-row{ border-top:0; }
+.result-line.ind1{ padding-left:28px; }
+.result-line.ind2{ padding-left:44px; }
+.r-loc{ font-size:.78em; opacity:.6; letter-spacing:1px; white-space:nowrap; }
+.ev-snip{
+    padding:0 12px 5px 28px;
+    font-size:.78em;
+    opacity:.7;
+    overflow-wrap:anywhere;
+}
+@media (max-width:640px){ .r-loc{ display:none; } }
