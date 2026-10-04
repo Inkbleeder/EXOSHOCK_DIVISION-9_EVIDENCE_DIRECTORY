@@ -309,7 +309,7 @@ const Main = (() => {
     if (!Archive.loaded) {
       /* index is the single point of failure - be loud about it */
       console.error("[archive] evidence index failed to load: " + Archive.loadError +
-                    " - serve the folder over HTTP and check data/evidence.json.");
+                    " - serve the folder over HTTP and check js/evidence.js.");
       Term.print("ARCHIVE INDEX OFFLINE.", "err");
       Term.print("RECORDS UNAVAILABLE. CONTACT THE SYSTEM ADMINISTRATOR.", "dim");
       setStatus("DEGRADED", false);
