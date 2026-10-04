@@ -139,7 +139,9 @@ const WinMgr = (() => {
     if (mem) { el.style.left = mem.x + "px"; el.style.top = mem.y + "px"; }
     else {
       cascade = (cascade + 1) % 8;
-      el.style.left = (14 + cascade * 26) + "px";
+      const lp = document.getElementById("list-panel");
+      const base = lp ? lp.offsetLeft : 0;           /* start over the list, not the command column */
+      el.style.left = (base + 14 + cascade * 26) + "px";
       el.style.top = (10 + cascade * 22) + "px";
     }
 
