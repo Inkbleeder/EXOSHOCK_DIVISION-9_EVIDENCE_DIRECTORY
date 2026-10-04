@@ -256,7 +256,7 @@ const Term = (() => {
       kind = "cmd";
     } else {
       const c = resolveCmd(tokens[0]);
-      if (["OPEN", "INFO", "DOWNLOAD", "RELATED"].includes(c)) {
+      if (["OPEN", "INFO", "RELATED"].includes(c)) {
         pool = Archive.visible().map(e => e.id);
         kind = "id";
       } else if (c === "SEARCH") {
@@ -433,13 +433,11 @@ const Term = (() => {
       printBox("SEARCH <words> [in:field]", "search records. Fields: ID FILE TITLE TYPE CATEGORY TAGS DATE DESCRIPTION ALL");
       printBox("OPEN <id>", "open a record in a viewer window. Typing just the ID (EV-003) or number (3) works too");
       printBox("INFO <id>", "show a record's details");
-      printBox("DOWNLOAD <id>", "retrieve the raw file");
       printBox("NEXT / PREV", "open the next or previous record");
       printBox("RELATED <id>", "list records linked to one");
       printBox("MUTE / UNMUTE", "silence or restore all sound");
       printBox("CLEAR", "clear the screen");
       printBox("MAIN", "return to the main site");
-      printBox("STATUS", "system diagnostics");
       printBox("REBOOT", "replay the boot sequence");
       print("Tab completes (press again to cycle) \u00b7 \u2191 \u2193 recalls previous commands \u00b7 ESC closes the front window", "system");
     },
@@ -541,15 +539,6 @@ const Term = (() => {
       Sound.play("success");
     });
 
-  cmd("DOWNLOAD", "Download an evidence file.", "DOWNLOAD <id>",
-    ({ args }) => {
-      if (!args[0]) { print("USAGE: DOWNLOAD <ID>", "err"); return; }
-      const ev = Archive.byId(args[0]);
-      if (!ev) { print("EVIDENCE NOT FOUND: " + args[0].toUpperCase(), "err"); return; }
-      Media.download(ev);
-    },
-    ["GET", "SAVE"]);
-
   cmd("NEXT", "Open the next record.", "NEXT",
     () => {
       if (!Media.lastOpenedId) { print("NO RECORD OPEN. USE OPEN <ID> FIRST.", "err"); return; }
@@ -613,30 +602,6 @@ const Term = (() => {
     },
     ["HOME", "EXIT"]);
 
-  const bootTime = Date.now();
-
-  function fmtUptime(ms) {
-    const s = Math.floor(ms / 1000);
-    return String(Math.floor(s / 3600)).padStart(2, "0") + ":" +
-           String(Math.floor(s / 60) % 60).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
-  }
-
-  cmd("STATUS", "System diagnostics.", "STATUS", () => {
-    const counts = Archive.typeCounts();
-    Sound.play("success");
-    print("SYSTEM DIAGNOSTICS", "success");
-    print("RECORDS:      " + Archive.items.length + " (" + (Archive.items.length - Archive.visible().length) + " HIDDEN)");
-    print("BY TYPE:      " + Object.entries(counts).map(([k, v]) => k.toUpperCase() + " " + v).join(" | "));
-    print("WINDOWS OPEN: " + WinMgr.openCount() + " (" + WinMgr.count() + " TOTAL)");
-    print("MEDIA LOADED: " + Media.stats().loaded + "   ERRORS: " + Media.stats().errors);
-    print("SESSION:      UNREGISTERED");
-    print("AUDIT TRAIL:  SUPPRESSED");
-    print("SOUND:        " + (Sound.muted ? "MUTED" : "ON"));
-    print("DISPLAY:      " + window.innerWidth + "x" + window.innerHeight);
-    print("UPTIME:       " + fmtUptime(Date.now() - bootTime));
-    print("INDEX SOURCE: data/evidence.json " + (Archive.loaded ? "[OK]" : "[ERROR: " + Archive.loadError + "]"), Archive.loaded ? "" : "err");
-  });
-
   cmd("REBOOT", "Replay the boot sequence.", "REBOOT", () => { clear(); Main.bootSequence(); });
 
   function init() {
@@ -648,7 +613,6 @@ const Term = (() => {
   return {
     print, printHTML, printNode, printBox, echo, clear, execute, init, refocus,
     resetResults, progress, whenIdle, skipTyping,
-    get resultsActive() { return resultsActive; },
-    bootTime
+    get resultsActive() { return resultsActive; }
   };
 })();
