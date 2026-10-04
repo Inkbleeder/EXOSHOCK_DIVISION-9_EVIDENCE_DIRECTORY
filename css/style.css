@@ -398,7 +398,6 @@ html.ready #app{
 }
 
 .rmeta,
-.r-date,
 .r-file{
     font-size:.78em;
     opacity:.55;
@@ -892,7 +891,6 @@ html.ready #app{
 
     .ev-key{ flex-basis:10ch; }
 
-    .r-date,
     .r-file{ display:none; }
 
     .d9-window{ min-width:180px; }
