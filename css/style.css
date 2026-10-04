@@ -219,33 +219,113 @@ html.ready #app{
     flex:1 1 auto;
     min-height:0;
     overflow:hidden;
+    display:flex;
 }
 
+/* left: commands */
 #terminal-panel{
-    position:absolute;
-    inset:0;
+    position:relative;
+    flex:0 0 clamp(260px, 28%, 400px);
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    border-right:1px solid var(--border);
 }
 
 #terminal-output{
-
-    position:absolute;
-    inset:0;
-
+    flex:1 1 auto;
+    min-height:0;
     overflow-y:auto;
-
-    padding:22px;
-
+    padding:16px;
     white-space:pre-wrap;
     word-break:break-word;
-
-    line-height:1.55;
-
+    line-height:1.5;
     scrollbar-width:thin;
-
 }
 
 #terminal-output::-webkit-scrollbar{ width:10px; }
 #terminal-output::-webkit-scrollbar-thumb{ background:rgba(var(--green-rgb),.2); }
+
+/* centre: the index, always on screen */
+#list-panel{
+    position:relative;
+    flex:1 1 auto;
+    min-width:0;
+    min-height:0;
+}
+
+#list-output{
+    position:absolute;
+    inset:0;
+    z-index:1;
+    overflow-y:auto;
+    padding:16px 20px;
+    scrollbar-width:thin;
+}
+
+#list-output::-webkit-scrollbar{ width:10px; }
+#list-output::-webkit-scrollbar-thumb{ background:rgba(var(--green-rgb),.2); }
+
+#list-output .ev-panel{
+    max-width:none;
+    margin:0;
+    animation:help-fade-in .5s ease;
+}
+
+#list-output .ev-row{ font-size:.95em; padding:6px 12px; }
+#list-output .ev-cat{ font-size:.95em; }
+.idx-wait{ opacity:.45; letter-spacing:2px; padding:6px 2px; }
+
+/* right: data flow */
+#flow-panel{
+    position:relative;
+    flex:0 0 clamp(130px, 11%, 170px);
+    overflow:hidden;
+    border-left:1px solid var(--border);
+    background:rgba(var(--green-rgb),.025);
+    pointer-events:none;
+    user-select:none;
+    opacity:0;
+    transition:opacity 1.5s ease;
+}
+
+#flow-panel.on{ opacity:1; }
+
+#flow-feed{
+    position:absolute;
+    inset:0;
+    padding:0 8px 6px;
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-end;
+    overflow:hidden;
+    font-size:12px;
+    line-height:1.45;
+    white-space:pre;
+    -webkit-mask-image:linear-gradient(to bottom, transparent 0%, #000 30%);
+            mask-image:linear-gradient(to bottom, transparent 0%, #000 30%);
+}
+
+#flow-feed .f{ opacity:.5; text-shadow:none; }
+
+/* the eye, in the middle of the column */
+#flow-eye{
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    margin:0;
+    padding:6px 4px;
+    font:bold 12px/1.15 "Courier New", monospace;
+    white-space:pre;
+    color:var(--green);
+    background:rgba(2,5,3,.92);
+    text-shadow:0 0 8px var(--green);
+    opacity:0;
+    transition:opacity .7s ease;
+}
+
+#flow-eye.show{ opacity:1; }
 
 .line{ min-height:1.2em; }
 
@@ -473,19 +553,18 @@ html.ready #app{
 }
 
 #notice.alert{
-    background:rgba(255,85,85,.08);
+    background:rgba(178,107,255,.08);
 }
 
 #notice.alert .notice-label{
-    color:var(--red);
-    border-color:var(--red);
+    color:#b26bff;
+    border-color:#b26bff;
     opacity:1;
 }
 
 #notice.alert #notice-text{
-    color:var(--red);
+    color:#b26bff;
     opacity:.95;
-    animation:blink 1.4s steps(1) infinite;
 }
 
 /* ===========================================================
@@ -552,7 +631,9 @@ html.ready #app{
     align-items:center;
     gap:12px;
 
-    padding:18px;
+    padding:14px 16px;
+
+    flex:0 0 auto;
 
     border-top:1px solid var(--border);
 
@@ -904,6 +985,22 @@ html.ready #app{
 
 }
 
+@media (max-width:700px){
+
+    #desktop{ flex-direction:column; }
+
+    #terminal-panel{
+        flex:0 0 44%;
+        border-right:0;
+        border-bottom:1px solid var(--border);
+    }
+
+    #flow-panel{ display:none; }
+
+    #list-output{ padding:10px; }
+
+}
+
 @media (max-width:420px){
 
     .divider{ display:none; }
@@ -912,44 +1009,22 @@ html.ready #app{
 
 
 /* ===========================================================
-   Boot: breach styling
-   While access is being refused the whole terminal turns red
-   (every colour reads off these variables), then returns to
-   green once the warning has been "bypassed".
+   Boot: unknown party in the system
+   While the backdoor is being forced the terminal turns purple
+   (every colour reads off these variables, status colours
+   included). It is a steady recolour only - no animation. It
+   returns to green once the backdoor is accepted.
    =========================================================== */
 
-html.ready #app.breach,
-#app.breach{
-    --green:#ff5a4d;
-    --green-rgb:255,90,77;
-    --border:rgba(255,90,77,.45);
-    animation:breach-pulse 1s ease-in-out infinite;
-}
-
-html.ready #app.breach{ animation:breach-pulse 1s ease-in-out infinite; }
-
-@keyframes breach-pulse{
-    0%,100%{ box-shadow:0 0 22px rgba(255,90,77,.25), inset 0 0 35px rgba(255,90,77,.08); }
-    50%    { box-shadow:0 0 42px rgba(255,90,77,.55), inset 0 0 70px rgba(255,90,77,.2); }
-}
-
-#app.glitch,
-html.ready #app.glitch{
-    animation:glitch .15s steps(2) infinite;
-}
-
-@keyframes glitch{
-    0%  { transform:translateX(0); filter:none; }
-    20% { transform:translateX(-3px); filter:hue-rotate(40deg); }
-    40% { transform:translateX(4px); }
-    60% { transform:translateX(-4px); filter:hue-rotate(-40deg); }
-    80% { transform:translateX(2px); }
-    100%{ transform:translateX(0); filter:none; }
-}
-
-@media (prefers-reduced-motion: reduce){
-    #app.breach, #app.glitch, html.ready #app.breach, html.ready #app.glitch{ animation:none; }
-    #notice.alert #notice-text{ animation:none; }
+#app.breach,
+html.ready #app.breach{
+    --green:#b26bff;
+    --green-rgb:178,107,255;
+    --green-dim:#8a4fd1;
+    --border:rgba(178,107,255,.45);
+    --red:#b26bff;
+    --yellow:#d6b3ff;
+    --blue:#c9a0ff;
 }
 
 .warn-box{
@@ -984,7 +1059,7 @@ html.ready #app.glitch{
    =========================================================== */
 
 /* faint company mark behind the output */
-#terminal-panel::after{
+#list-panel::after{
     content:"BSLSK";
     position:absolute;
     right:4%;
@@ -1000,7 +1075,6 @@ html.ready #app.glitch{
     user-select:none;
 }
 
-#terminal-output{ z-index:1; }
 
 .footer-stamp{
     padding:0 6px;
@@ -1038,3 +1112,7 @@ html.ready #app.glitch{
     overflow-wrap:anywhere;
 }
 @media (max-width:640px){ .r-loc{ display:none; } }
+
+#terminal-output .ev-row.result-line{ flex-wrap:wrap; row-gap:2px; }
+#terminal-output .r-loc{ white-space:normal; }
+#terminal-output .ev-snip{ padding-left:12px; }
