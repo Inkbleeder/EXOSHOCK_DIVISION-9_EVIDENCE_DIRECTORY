@@ -1,6 +1,6 @@
 /*
 ===========================================================
-DIVISION-9 EVIDENCE ARCHIVE - ENTRIES
+DIVISION-9 EVIDENCE DIRECTORY - ENTRIES
 
 HOW TO ADD A RECORD
   1. Drop the file into the media/ folder (any name, no spaces
@@ -52,10 +52,10 @@ Anything not listed follows in the order first used in this file.
 */
 
 const D9_CONFIG = {
-    archiveName: "DIVISION 9 // EVIDENCE ARCHIVE",
+    archiveName: "DIVISION 9 // EVIDENCE DIRECTORY",
     version: "1.0",
     prompt: "D9>",
-    categoryOrder: ["Communications", "Surveillance", "Administration", "Personnel", "External"]
+    categoryOrder: ["Communications", "Surveillance", "Administration", "Personnel"]
 };
 
 const D9_EVIDENCE = [];
@@ -168,13 +168,4 @@ add({
     description: "Sealed record. Not indexed. Access by exact title only.",
     tags: ["personnel", "sealed"],
     hidden: true,
-});
-
-add({
-    title: "External Briefing (Reference Link)",
-    category: "External",
-    subcategory: "Referenced Material",
-    description: "Material held outside this archive. Opens in a new tab.",
-    tags: ["external", "briefing"],
-    externalUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
 });
