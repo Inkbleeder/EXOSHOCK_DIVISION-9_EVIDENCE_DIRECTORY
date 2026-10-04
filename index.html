@@ -76,7 +76,9 @@
   <audio id="ambience" preload="auto"></audio>
 
   <script src="js/sound.js?v=4"></script>
-  <script src="js/archive.js?v=4"></script>
+  <!-- entries: edit js/evidence.js (timestamp stops the browser serving an old copy) -->
+  <script>document.write('<script src="js/evidence.js?t=' + Date.now() + '"><\/script>');</script>
+  <script src="js/archive.js?v=5"></script>
   <script src="js/windows.js?v=4"></script>
   <script src="js/media.js?v=4"></script>
   <script src="js/terminal.js?v=4"></script>
