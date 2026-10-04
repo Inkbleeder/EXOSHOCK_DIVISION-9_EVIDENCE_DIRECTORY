@@ -188,7 +188,6 @@ const Term = (() => {
     const t = mk("span", "r-title");
     t.innerHTML = hlHTML(ev.title, words);
     row.appendChild(t);
-    row.appendChild(mk("span", "r-date", ev.date || ""));
     row.addEventListener("click", () => { resetResults(); Media.open(ev); });
     panel.appendChild(row);
     results.push(ev.key); resultEls.push(row);
@@ -304,7 +303,7 @@ const Term = (() => {
         const names = new Set();
         if (c === "OPEN" || c === "RELATED" || c === "SEARCH") Archive.visible().forEach(e => names.add(e.title));
         if (c === "LIST" || c === "SEARCH") Archive.categories().concat(Archive.subcategories()).forEach(n => names.add(n));
-        if (c === "LIST") ["IMAGES", "GIFS", "VIDEOS", "AUDIO", "DOCS", "LINKS", "/SORT:TITLE", "/SORT:DATE", "/SORT:TYPE", "/DESC"].forEach(n => names.add(n));
+        if (c === "LIST") ["IMAGES", "GIFS", "VIDEOS", "AUDIO", "DOCS", "LINKS", "/SORT:TITLE", "/SORT:TYPE", "/DESC"].forEach(n => names.add(n));
         return [...names]
           .filter(n => n.toLowerCase().startsWith(rest))
           .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
@@ -490,7 +489,7 @@ const Term = (() => {
       }
       Sound.play("success");
       print("APPROVED COMMANDS:", "success");
-      printBox("LIST [category|subcategory|type]", "list every category and its records, or just one. Flags: /SORT:TITLE|DATE|TYPE  /DESC");
+      printBox("LIST [category|subcategory|type]", "list every category and its records, or just one. Flags: /SORT:TITLE|TYPE  /DESC");
       printBox("SEARCH <term>", "search titles and file contents");
       printBox("OPEN <name>", "open a record in a viewer window. Typing just the name works too. Use \"open <category> <name>\" if two records share a title");
       printBox("NEXT / PREV", "open the next or previous record");
