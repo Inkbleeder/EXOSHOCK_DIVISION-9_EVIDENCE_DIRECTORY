@@ -175,37 +175,80 @@ const Term = (() => {
     results = []; resultEls = []; resultIdx = -1; resultsActive = false;
   }
 
-  function showResults(list, title, words) {
-    resetResults();
-    if (!list.length) { print("NO MATCHING RECORDS.", "warning"); return; }
-
-    const panel = mk("div", "ev-panel");
+  function addPanelHead(panel, title, count, unit) {
     const head = mk("div", "ev-head");
     head.appendChild(mk("span", "", title));
-    head.appendChild(mk("span", "", list.length + (list.length === 1 ? " RECORD" : " RECORDS")));
+    head.appendChild(mk("span", "", count + (count === 1 ? " " + unit : " " + unit + "S")));
     panel.appendChild(head);
+  }
 
-    list.forEach(ev => {
-      const row = mk("div", "ev-row result-line");
-      row.appendChild(mk("span", "r-id", ev.id));
-      row.appendChild(mk("span", "ev-badge t-" + ev.type, TYPE_TAGS[ev.type]));
-      const t = mk("span", "r-title");
-      t.innerHTML = hlHTML(ev.title, words);
-      row.appendChild(t);
-      row.appendChild(mk("span", "r-date", ev.date || ""));
-      const f = mk("span", "r-file");
-      f.innerHTML = hlHTML(ev.filename || ev.file || "", words);
-      row.appendChild(f);
-      row.addEventListener("click", () => { resetResults(); Media.open(ev); });
-      panel.appendChild(row);
-      results.push(ev.id); resultEls.push(row);
-    });
+  function makeRow(ev, words, indent, panel) {
+    const row = mk("div", "ev-row result-line ind" + indent);
+    row.appendChild(mk("span", "ev-badge t-" + ev.type, TYPE_TAGS[ev.type]));
+    const t = mk("span", "r-title");
+    t.innerHTML = hlHTML(ev.title, words);
+    row.appendChild(t);
+    row.appendChild(mk("span", "r-date", ev.date || ""));
+    row.addEventListener("click", () => { resetResults(); Media.open(ev); });
+    panel.appendChild(row);
+    results.push(ev.key); resultEls.push(row);
+    return row;
+  }
 
-    printNode(panel);
-    print("TYPE AN ID TO OPEN IT, OR USE \u2191 \u2193 + ENTER ON AN EMPTY LINE. (CLICKING A ROW WORKS TOO.)", "dim");
+  function finishResults() {
+    print("TYPE A RECORD NAME TO OPEN IT, OR USE \u2191 \u2193 + ENTER ON AN EMPTY LINE. (CLICKING A ROW WORKS TOO.)", "dim");
     Sound.play("success");
     resultsActive = true;
     selectResult(0, true);
+  }
+
+  /* LIST / pick lists. Tree layout matches the main site's database index:
+       [CATEGORY]
+           Title
+           [SUBCATEGORY]
+               Title                                                   */
+  function showResults(list, title, words, opts) {
+    resetResults();
+    opts = opts || {};
+    if (!list.length) { print("NO MATCHING RECORDS.", "warning"); return; }
+
+    const panel = mk("div", "ev-panel");
+    addPanelHead(panel, title, list.length, "RECORD");
+
+    const ordered = items => opts.sort ? Archive.sort(items, opts.sort, opts.desc) : items;
+    if (opts.flat) list.forEach(ev => makeRow(ev, words, 0, panel));
+    else Archive.group(list).forEach(g => {
+      panel.appendChild(mk("div", "ev-cat", "[" + g.category.toUpperCase() + "]"));
+      ordered(g.direct).forEach(ev => makeRow(ev, words, 1, panel));
+      g.subs.forEach(sc => {
+        panel.appendChild(mk("div", "ev-sub", "[" + sc.name.toUpperCase() + "]"));
+        ordered(sc.items).forEach(ev => makeRow(ev, words, 2, panel));
+      });
+    });
+
+    printNode(panel);
+    finishResults();
+  }
+
+  /* SEARCH results, same shape as the main site's: each hit shows
+     [CATEGORY / SUBCATEGORY] Title with the term highlighted, plus an
+     excerpt line when the match is inside the file body. */
+  function showSearch(hits, term) {
+    resetResults();
+    const panel = mk("div", "ev-panel");
+    addPanelHead(panel, "SEARCH RESULTS FOR \"" + term + "\"", hits.length, "RESULT");
+    hits.forEach(h => {
+      const ev = h.entry;
+      const row = makeRow(ev, [term], 0, panel);
+      row.insertBefore(mk("span", "r-loc", "[" + Archive.location(ev).toUpperCase() + "]"), row.children[1]);
+      if (h.snippet) {
+        const sn = mk("div", "ev-snip");
+        sn.innerHTML = "\"" + hlHTML(h.snippet, [term]) + "\"";
+        panel.appendChild(sn);
+      }
+    });
+    printNode(panel);
+    finishResults();
   }
 
   function selectResult(i, noScroll) {
@@ -228,7 +271,7 @@ const Term = (() => {
 
   function openSelected() {
     if (!resultsActive || resultIdx < 0) return false;
-    const ev = Archive.byId(results[resultIdx]);
+    const ev = Archive.byKey(results[resultIdx]);
     resetResults();
     if (ev) Media.open(ev);
     return true;
@@ -256,15 +299,16 @@ const Term = (() => {
       kind = "cmd";
     } else {
       const c = resolveCmd(tokens[0]);
-      if (["OPEN", "INFO", "RELATED"].includes(c)) {
-        pool = Archive.visible().map(e => e.id);
-        kind = "id";
-      } else if (c === "SEARCH") {
-        pool = ["in:id", "in:file", "in:title", "in:type", "in:category", "in:tags", "in:date", "in:description", "in:all"];
-        kind = "field";
-      } else if (c === "LIST") {
-        pool = ["IMAGES", "GIFS", "VIDEOS", "AUDIO", "DOCS", "LINKS", "/SORT:ID", "/SORT:TITLE", "/SORT:DATE", "/SORT:TYPE", "/DESC"];
-        kind = "list";
+      if (["OPEN", "RELATED", "SEARCH", "LIST"].includes(c)) {
+        const rest = tokens.slice(1).join(" ").toLowerCase();
+        const names = new Set();
+        if (c === "OPEN" || c === "RELATED" || c === "SEARCH") Archive.visible().forEach(e => names.add(e.title));
+        if (c === "LIST" || c === "SEARCH") Archive.categories().concat(Archive.subcategories()).forEach(n => names.add(n));
+        if (c === "LIST") ["IMAGES", "GIFS", "VIDEOS", "AUDIO", "DOCS", "LINKS", "/SORT:TITLE", "/SORT:DATE", "/SORT:TYPE", "/DESC"].forEach(n => names.add(n));
+        return [...names]
+          .filter(n => n.toLowerCase().startsWith(rest))
+          .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+          .map(n => tokens[0] + " " + n);
       } else if (c === "HELP") {
         pool = Object.keys(commands);
         kind = "cmd";
@@ -330,17 +374,14 @@ const Term = (() => {
 
     const tokens = raw.split(/\s+/);
 
-    /* a lone ID (EV-003) or number (3) opens that record */
-    if (tokens.length === 1 && /^(ev-)?\d+$/i.test(tokens[0])) {
-      const digits = tokens[0].replace(/^ev-/i, "");
-      const id = "EV-" + digits.padStart(3, "0");
-      const ev = Archive.byId(id);
-      if (ev) { Media.open(ev); return; }
-      print("EVIDENCE NOT FOUND: " + id, "err");
-      return;
-    }
-
     const name = resolveCmd(tokens[0]);
+
+    /* not a command: if it names a record, open it */
+    if (!commands[name]) {
+      const f = Archive.find(raw);
+      if (f.exact) { Media.open(f.exact); return; }
+      if (f.ambiguous || f.matches.length > 1) { openByName(raw, "OPEN <NAME>"); return; }
+    }
     const { flags, args } = parseArgs(tokens.slice(1));
     const c = commands[name];
 
@@ -417,11 +458,31 @@ const Term = (() => {
 
   /* ---------- commands ---------- */
 
+  /* open by name: exact, or a unique partial; several matches show a pick list */
+  function openByName(q, usage) {
+    if (!q) { print("USAGE: " + usage + "   (TAB COMPLETES NAMES)", "err"); return null; }
+    const f = Archive.find(q);
+    if (f.exact) { Media.open(f.exact); return f.exact; }
+    if (f.ambiguous) {
+      print("MULTIPLE ENTRIES FOUND: \"" + q + "\"", "warning");
+      f.matches.forEach(e => print("[" + Archive.location(e).toUpperCase() + "]"));
+      print("Type 'open <category/subcategory> " + q + "' to specify - see location(s) above.", "dim");
+      return null;
+    }
+    if (f.matches.length > 1) {
+      print("MULTIPLE RECORDS MATCH. BE MORE SPECIFIC:", "warning");
+      showResults(f.matches, "MATCHING \"" + q.toUpperCase() + "\"", [q], { flat: true });
+      return null;
+    }
+    print("ERROR 0xA143", "err");
+    print("FILE NOT FOUND", "err");
+    return null;
+  }
+
   cmd("HELP", "Show command help.", "HELP [command]",
     ({ args }) => {
       if (args[0]) {
-        const n = resolveCmd(args[0]);
-        const c = commands[n];
+        const c = commands[resolveCmd(args[0])];
         if (!c) { print("NO HELP ENTRY: " + args[0].toUpperCase(), "err"); return; }
         Sound.play("success");
         printBox(c.usage, c.desc);
@@ -429,120 +490,44 @@ const Term = (() => {
       }
       Sound.play("success");
       print("APPROVED COMMANDS:", "success");
-      printBox("LIST [type|category]", "list the archive. Flags: /SORT:ID|TITLE|DATE|TYPE  /DESC");
-      printBox("SEARCH <words> [in:field]", "search records. Fields: ID FILE TITLE TYPE CATEGORY TAGS DATE DESCRIPTION ALL");
-      printBox("OPEN <id>", "open a record in a viewer window. Typing just the ID (EV-003) or number (3) works too");
-      printBox("INFO <id>", "show a record's details");
+      printBox("LIST [category|subcategory|type]", "list every category and its records, or just one. Flags: /SORT:TITLE|DATE|TYPE  /DESC");
+      printBox("SEARCH <term>", "search titles and file contents");
+      printBox("OPEN <name>", "open a record in a viewer window. Typing just the name works too. Use \"open <category> <name>\" if two records share a title");
       printBox("NEXT / PREV", "open the next or previous record");
-      printBox("RELATED <id>", "list records linked to one");
+      printBox("RELATED [name]", "list records linked to one (defaults to the last record opened)");
       printBox("MUTE / UNMUTE", "silence or restore all sound");
       printBox("CLEAR", "clear the screen");
-      printBox("MAIN", "return to the main site");
       printBox("REBOOT", "replay the boot sequence");
       print("Tab completes (press again to cycle) \u00b7 \u2191 \u2193 recalls previous commands \u00b7 ESC closes the front window", "system");
     },
     ["MAN", "?"]);
 
-  cmd("LIST", "List archive records.", "LIST [type|category] [/SORT:field] [/DESC]",
+  cmd("LIST", "List archive records.", "LIST [category|subcategory|type] [/SORT:field] [/DESC]",
     ({ args, flags }) => {
-      let list;
-      let label = "ALL VISIBLE RECORDS";
-      if (args[0]) {
-        const t = Archive.typeFromKeyword(args[0]);
-        if (t) { list = Archive.filter(Archive.visible(), { type: t }); label = "TYPE: " + t.toUpperCase(); }
-        else { list = Archive.filter(Archive.visible(), { category: args[0] }); label = "CATEGORY: " + args[0].toUpperCase(); }
-      } else {
-        list = Archive.visible();
-      }
-      if (flags.sort) list = Archive.sort(list, flags.sort, !!flags.desc);
-      showResults(list, "ARCHIVE INDEX \u2014 " + label);
+      const sec = Archive.section(args.join(" "));
+      if (args.length && !sec.list.length) { print("ERROR 0xA143", "err"); print("FILE NOT FOUND", "err"); return; }
+      showResults(sec.list, "ARCHIVE INDEX \u2014 " + sec.label, null, { sort: flags.sort, desc: !!flags.desc });
     },
     ["DIR", "LS"]);
 
-  cmd("SEARCH", "Search archive records.", "SEARCH <query> [in:FIELD]",
-    ({ args, flags }) => {
-      const field = (flags.in || "all");
-      const q = args.join(" ");
-      if (!q) { print("USAGE: SEARCH <query> [in:FIELD]", "err"); return; }
-      const list = Archive.search(q, field);
-      const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-      showResults(Archive.sort(list, "id", false), "SEARCH \u2014 \"" + q.toUpperCase() + "\" IN " + field.toUpperCase(), [q.toLowerCase()].concat(words));
+  cmd("SEARCH", "Search titles and file contents.", "SEARCH <term>",
+    ({ args }) => {
+      const term = args.join(" ").trim();
+      if (!term) { print("USAGE: search <term>", "err"); return; }
+      const hits = Archive.search(term);
+      if (!hits.length) { print("NO RESULTS FOR \"" + term + "\"", "err"); return; }
+      showSearch(hits, term);
     },
     ["FIND", "GREP"]);
 
-  cmd("OPEN", "Open an evidence record in a viewer window.", "OPEN <id>",
-    ({ args }) => {
-      if (!args[0]) { print("USAGE: OPEN <ID>   (TAB COMPLETES IDS)", "err"); return; }
-      const ev = Archive.byId(args[0]);
-      if (!ev) {
-        const near = Archive.search(args[0], "id");
-        print("NO RECORD ON FILE: " + args[0].toUpperCase(), "err");
-        if (near.length) print("CLOSE MATCH: " + near[0].id + " \u2014 " + near[0].title, "dim");
-        else print("IF THE RECORD EXISTS, YOU ARE NOT CLEARED TO KNOW.", "dim");
-        return;
-      }
-      Media.open(ev);
-    },
+  cmd("OPEN", "Open a record in a viewer window.", "OPEN <name>",
+    ({ args }) => { openByName(args.join(" "), "OPEN <NAME>"); },
     ["PLAY", "VIEW"]);
-
-  cmd("INFO", "Show evidence metadata.", "INFO <id>",
-    ({ args }) => {
-      if (!args[0]) { print("USAGE: INFO <ID>", "err"); return; }
-      const ev = Archive.byId(args[0]);
-      if (!ev) { print("EVIDENCE NOT FOUND: " + args[0].toUpperCase(), "err"); return; }
-
-      const panel = mk("div", "ev-panel");
-      const head = mk("div", "ev-head");
-      head.appendChild(mk("span", "", "RECORD " + ev.id));
-      head.appendChild(mk("span", "", TYPE_TAGS[ev.type] + (ev.category ? " / " + ev.category.toUpperCase() : "")));
-      panel.appendChild(head);
-
-      const kv = (k, v) => {
-        const row = mk("div", "ev-row");
-        row.appendChild(mk("span", "ev-key", k));
-        row.appendChild(mk("span", "ev-val", v));
-        panel.appendChild(row);
-        return row;
-      };
-
-      kv("TITLE", ev.title);
-      kv("FILE", ev.filename || ev.file || "(none)");
-      kv("PATH", ev.file || "(none)");
-      kv("DATE", ev.date || "UNKNOWN");
-      kv("SIZE", ev.size || "UNKNOWN");
-      kv("CLASS", ev.locked ? "RESTRICTED // SEALED" : ev.hidden ? "SEALED // INDEX HIDDEN" : "INTERNAL USE ONLY");
-      kv("HANDLING", "DO NOT DISTRIBUTE");
-      kv("ACCESS LOG", "SUPPRESSED");
-      if (ev.description) kv("NOTES", ev.description);
-      if (ev.tags.length) kv("TAGS", ev.tags.join(", "));
-
-      if (ev.related.length) {
-        const row = kv("RELATED", "");
-        const val = row.lastChild;
-        ev.related.forEach(rid => {
-          const r = Archive.byId(rid);
-          const s = mk("span", "evlink", rid);
-          s.addEventListener("click", () => { if (r) { resetResults(); Media.open(r); } });
-          val.appendChild(s);
-          val.appendChild(document.createTextNode("  "));
-        });
-      }
-
-      if (ev.externalUrl) {
-        const row = kv("EXTERNAL", "");
-        const a = mk("a", "evlink", ev.externalUrl);
-        a.href = ev.externalUrl; a.target = "_blank"; a.rel = "noopener noreferrer";
-        row.lastChild.appendChild(a);
-      }
-
-      printNode(panel);
-      Sound.play("success");
-    });
 
   cmd("NEXT", "Open the next record.", "NEXT",
     () => {
-      if (!Media.lastOpenedId) { print("NO RECORD OPEN. USE OPEN <ID> FIRST.", "err"); return; }
-      const n = Archive.neighbors(Media.lastOpenedId).next;
+      if (!Media.lastOpenedKey) { print("NO RECORD OPEN. USE OPEN <NAME> FIRST.", "err"); return; }
+      const n = Archive.neighbors(Media.lastOpenedKey).next;
       if (!n) { print("END OF INDEX. NO FURTHER RECORDS.", "warning"); return; }
       Media.open(n);
     },
@@ -550,21 +535,25 @@ const Term = (() => {
 
   cmd("PREV", "Open the previous record.", "PREV",
     () => {
-      if (!Media.lastOpenedId) { print("NO RECORD OPEN. USE OPEN <ID> FIRST.", "err"); return; }
-      const p = Archive.neighbors(Media.lastOpenedId).prev;
+      if (!Media.lastOpenedKey) { print("NO RECORD OPEN. USE OPEN <NAME> FIRST.", "err"); return; }
+      const p = Archive.neighbors(Media.lastOpenedKey).prev;
       if (!p) { print("START OF INDEX. NO EARLIER RECORDS.", "warning"); return; }
       Media.open(p);
     },
     ["PREVIOUS", "B", "BACK"]);
 
-  cmd("RELATED", "List evidence linked to a record.", "RELATED <id>",
+  cmd("RELATED", "List records linked to a record.", "RELATED [name]",
     ({ args }) => {
-      if (!args[0]) { print("USAGE: RELATED <ID>", "err"); return; }
-      const ev = Archive.byId(args[0]);
-      if (!ev) { print("EVIDENCE NOT FOUND: " + args[0].toUpperCase(), "err"); return; }
-      if (!ev.related.length) { print("NO LINKED RECORDS FOR " + ev.id + ".", "warning"); return; }
-      const list = ev.related.map(r => Archive.byId(r)).filter(Boolean);
-      showResults(list, "RECORDS LINKED TO " + ev.id);
+      const q = args.join(" ");
+      let ev = q ? Archive.find(q).exact : Archive.byKey(Media.lastOpenedKey);
+      if (!ev) {
+        if (!q) print("NO RECORD OPEN. USE RELATED <NAME>.", "err");
+        else print("NO RECORD ON FILE: " + q.toUpperCase(), "err");
+        return;
+      }
+      const list = ev.related.map(t => Archive.byTitle(t)).filter(Boolean);
+      if (!list.length) { print("NO LINKED RECORDS FOR " + ev.title.toUpperCase() + ".", "warning"); return; }
+      showResults(list, "LINKED TO " + ev.title.toUpperCase(), null, { flat: true });
     },
     ["LINKS"]);
 
@@ -592,15 +581,6 @@ const Term = (() => {
       else if (v === "OFF") { Sound.setMuted(true); print("SOUND MUTED", "system"); }
       else print("USAGE: SOUND ON | OFF   (CURRENTLY " + (Sound.muted ? "OFF" : "ON") + ")", "system");
     });
-
-  cmd("MAIN", "Return to the main site.", "MAIN",
-    () => {
-      const url = Archive.config.mainSite;
-      if (!url) { print("MAIN SITE LINK NOT CONFIGURED. SET config.mainSite IN data/evidence.json.", "err"); return; }
-      printHTML("RETURNING TO MAIN SITE. CLICK TO PROCEED: <a class='evlink' href='" + esc(url) + "'>" + esc(url) + "</a>");
-      print("(THE MAIN SITE ALSO REDIRECTS HERE THROUGH ITS ARCHIVE COMMAND.)", "dim");
-    },
-    ["HOME", "EXIT"]);
 
   cmd("REBOOT", "Replay the boot sequence.", "REBOOT", () => { clear(); Main.bootSequence(); });
 
