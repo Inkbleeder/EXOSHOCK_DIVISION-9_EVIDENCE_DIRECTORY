@@ -11,6 +11,7 @@ const Term = (() => {
   const input = document.getElementById("cmdline");
   const promptEl = document.getElementById("prompt");
   const tabHint = document.getElementById("tab-hint");
+  const listOut = document.getElementById("list-output");
 
   const history = [];
   let histIdx = -1;
@@ -250,6 +251,46 @@ const Term = (() => {
     finishResults();
   }
 
+  /* ---------- the index panel (always on screen) ----------
+       [CATEGORY]
+           Title
+           [SUBCATEGORY]
+               Title                                              */
+
+  function clearIndex(text) {
+    listOut.innerHTML = "";
+    if (text) listOut.appendChild(mk("div", "idx-wait", text));
+  }
+
+  function renderIndex() {
+    listOut.innerHTML = "";
+    const list = Archive.visible();
+    const panel = mk("div", "ev-panel");
+    const head = mk("div", "ev-head");
+    head.appendChild(mk("span", "", "DIRECTORY INDEX"));
+    head.appendChild(mk("span", "", list.length + (list.length === 1 ? " RECORD" : " RECORDS")));
+    panel.appendChild(head);
+
+    const addRow = (ev, indent) => {
+      const row = mk("div", "ev-row result-line ind" + indent);
+      row.appendChild(mk("span", "ev-badge t-" + ev.type, TYPE_TAGS[ev.type]));
+      row.appendChild(mk("span", "r-title", ev.title));
+      row.addEventListener("click", () => { resetResults(); Media.open(ev); });
+      panel.appendChild(row);
+    };
+
+    Archive.group(list).forEach(g => {
+      panel.appendChild(mk("div", "ev-cat", "[" + g.category.toUpperCase() + "]"));
+      g.direct.forEach(ev => addRow(ev, 1));
+      g.subs.forEach(sc => {
+        panel.appendChild(mk("div", "ev-sub", "[" + sc.name.toUpperCase() + "]"));
+        sc.items.forEach(ev => addRow(ev, 2));
+      });
+    });
+    listOut.appendChild(panel);
+    listOut.scrollTop = 0;
+  }
+
   function selectResult(i, noScroll) {
     resultEls.forEach(el => el.classList.remove("sel"));
     resultIdx = i;
@@ -298,12 +339,11 @@ const Term = (() => {
       kind = "cmd";
     } else {
       const c = resolveCmd(tokens[0]);
-      if (["OPEN", "RELATED", "SEARCH", "LIST"].includes(c)) {
+      if (["OPEN", "RELATED", "SEARCH"].includes(c)) {
         const rest = tokens.slice(1).join(" ").toLowerCase();
         const names = new Set();
-        if (c === "OPEN" || c === "RELATED" || c === "SEARCH") Archive.visible().forEach(e => names.add(e.title));
-        if (c === "LIST" || c === "SEARCH") Archive.categories().concat(Archive.subcategories()).forEach(n => names.add(n));
-        if (c === "LIST") ["IMAGES", "GIFS", "VIDEOS", "AUDIO", "DOCS", "LINKS", "/SORT:TITLE", "/SORT:TYPE", "/DESC"].forEach(n => names.add(n));
+        Archive.visible().forEach(e => names.add(e.title));
+        if (c === "SEARCH") Archive.categories().concat(Archive.subcategories()).forEach(n => names.add(n));
         return [...names]
           .filter(n => n.toLowerCase().startsWith(rest))
           .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
@@ -489,9 +529,8 @@ const Term = (() => {
       }
       Sound.play("success");
       print("APPROVED COMMANDS:", "success");
-      printBox("LIST [category|subcategory|type]", "list every category and its records, or just one. Flags: /SORT:TITLE|TYPE  /DESC");
-      printBox("SEARCH <term>", "search titles and file contents");
-      printBox("OPEN <name>", "open a record in a viewer window. Typing just the name works too. Use \"open <category> <name>\" if two records share a title");
+      printBox("SEARCH <term>", "search titles and file contents. Results appear here; the index stays put");
+      printBox("OPEN <name>", "open a record in a viewer window. Clicking it in the index works too, and so does typing just the name. Use \"open <category> <name>\" if two records share a title");
       printBox("NEXT / PREV", "open the next or previous record");
       printBox("RELATED [name]", "list records linked to one (defaults to the last record opened)");
       printBox("MUTE / UNMUTE", "silence or restore all sound");
@@ -500,14 +539,6 @@ const Term = (() => {
       print("Tab completes (press again to cycle) \u00b7 \u2191 \u2193 recalls previous commands \u00b7 ESC closes the front window", "system");
     },
     ["MAN", "?"]);
-
-  cmd("LIST", "List archive records.", "LIST [category|subcategory|type] [/SORT:field] [/DESC]",
-    ({ args, flags }) => {
-      const sec = Archive.section(args.join(" "));
-      if (args.length && !sec.list.length) { print("ERROR 0xA143", "err"); print("FILE NOT FOUND", "err"); return; }
-      showResults(sec.list, "ARCHIVE INDEX \u2014 " + sec.label, null, { sort: flags.sort, desc: !!flags.desc });
-    },
-    ["DIR", "LS"]);
 
   cmd("SEARCH", "Search titles and file contents.", "SEARCH <term>",
     ({ args }) => {
@@ -591,6 +622,7 @@ const Term = (() => {
 
   return {
     print, printHTML, printNode, printBox, echo, clear, execute, init, refocus,
+    renderIndex, clearIndex,
     resetResults, progress, whenIdle, skipTyping,
     get resultsActive() { return resultsActive; }
   };
