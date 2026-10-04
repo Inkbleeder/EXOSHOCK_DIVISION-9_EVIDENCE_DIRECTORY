@@ -348,7 +348,7 @@ const Term = (() => {
       const guess = Object.keys(commands).find(k => k.startsWith(name));
       print("UNKNOWN COMMAND: " + tokens[0].toUpperCase(), "err");
       if (guess) print("DID YOU MEAN: " + guess + " ?", "dim");
-      print("TYPE HELP FOR COMMAND LIST.", "dim");
+      print("TYPE HELP FOR APPROVED COMMANDS.", "dim");
       return;
     }
     try { c.fn({ args, flags }); }
@@ -428,7 +428,7 @@ const Term = (() => {
         return;
       }
       Sound.play("success");
-      print("AVAILABLE COMMANDS:", "success");
+      print("APPROVED COMMANDS:", "success");
       printBox("LIST [type|category]", "list the archive. Flags: /SORT:ID|TITLE|DATE|TYPE  /DESC");
       printBox("SEARCH <words> [in:field]", "search records. Fields: ID FILE TITLE TYPE CATEGORY TAGS DATE DESCRIPTION ALL");
       printBox("OPEN <id>", "open a record in a viewer window. Typing just the ID (EV-003) or number (3) works too");
@@ -478,8 +478,9 @@ const Term = (() => {
       const ev = Archive.byId(args[0]);
       if (!ev) {
         const near = Archive.search(args[0], "id");
-        print("EVIDENCE NOT FOUND: " + args[0].toUpperCase(), "err");
+        print("NO RECORD ON FILE: " + args[0].toUpperCase(), "err");
         if (near.length) print("CLOSE MATCH: " + near[0].id + " \u2014 " + near[0].title, "dim");
+        else print("IF THE RECORD EXISTS, YOU ARE NOT CLEARED TO KNOW.", "dim");
         return;
       }
       Media.open(ev);
@@ -511,7 +512,9 @@ const Term = (() => {
       kv("PATH", ev.file || "(none)");
       kv("DATE", ev.date || "UNKNOWN");
       kv("SIZE", ev.size || "UNKNOWN");
-      kv("STATUS", ev.locked ? "RESTRICTED" : ev.hidden ? "ARCHIVED / INDEX HIDDEN" : "UNRESTRICTED");
+      kv("CLASS", ev.locked ? "RESTRICTED // SEALED" : ev.hidden ? "SEALED // INDEX HIDDEN" : "INTERNAL USE ONLY");
+      kv("HANDLING", "DO NOT DISTRIBUTE");
+      kv("ACCESS LOG", "SUPPRESSED");
       if (ev.description) kv("NOTES", ev.description);
       if (ev.tags.length) kv("TAGS", ev.tags.join(", "));
 
@@ -626,6 +629,8 @@ const Term = (() => {
     print("BY TYPE:      " + Object.entries(counts).map(([k, v]) => k.toUpperCase() + " " + v).join(" | "));
     print("WINDOWS OPEN: " + WinMgr.openCount() + " (" + WinMgr.count() + " TOTAL)");
     print("MEDIA LOADED: " + Media.stats().loaded + "   ERRORS: " + Media.stats().errors);
+    print("SESSION:      UNREGISTERED");
+    print("AUDIT TRAIL:  SUPPRESSED");
     print("SOUND:        " + (Sound.muted ? "MUTED" : "ON"));
     print("DISPLAY:      " + window.innerWidth + "x" + window.innerHeight);
     print("UPTIME:       " + fmtUptime(Date.now() - bootTime));
@@ -635,7 +640,7 @@ const Term = (() => {
   cmd("REBOOT", "Replay the boot sequence.", "REBOOT", () => { clear(); Main.bootSequence(); });
 
   function init() {
-    promptEl.textContent = Archive.config.prompt || "D9>";
+    /* prompt is a plain ">" like the main terminal */
     input.addEventListener("keydown", onKey);
     refocus();
   }
