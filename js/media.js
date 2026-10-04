@@ -70,12 +70,6 @@ const Media = (() => {
       b.addEventListener("click", () => openById(Archive.neighbors(ev.id).next.id));
       bar.appendChild(b);
     }
-    if (ev.file && ev.downloadable) {
-      const b = document.createElement("button");
-      b.className = "wbtn"; b.textContent = "SAVE";
-      b.addEventListener("click", () => download(ev));
-      bar.appendChild(b);
-    }
     return { bar, time };
   }
 
@@ -159,7 +153,7 @@ const Media = (() => {
     wrap.appendChild(box);
     const note = document.createElement("div");
     note.className = "dim";
-    note.textContent = "IF THE DOCUMENT FAILS TO DISPLAY, USE SAVE TO RETRIEVE THE FILE.";
+    note.textContent = "IF THE DOCUMENT FAILS TO DISPLAY, CONTACT THE ARCHIVE ADMINISTRATOR.";
     wrap.appendChild(note);
     return {};
   }
