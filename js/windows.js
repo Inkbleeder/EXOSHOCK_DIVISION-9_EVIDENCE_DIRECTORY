@@ -60,7 +60,7 @@ const WinMgr = (() => {
     min.forEach(w => {
       const b = document.createElement("button");
       b.className = "task-item";
-      b.textContent = (w.evidenceId || w.title).slice(0, 22);
+      b.textContent = (w.label || w.title).slice(0, 22);
       b.addEventListener("click", () => restore(w));
       taskItems.appendChild(b);
     });
@@ -172,6 +172,7 @@ const WinMgr = (() => {
       id: ++seq, el, body, header,
       title: opts.title || "WINDOW",
       evidenceId: opts.evidenceId || null,
+      label: opts.label || null,
       tag: opts.tag || null,
       minimized: false,
       onClose: opts.onClose || null
@@ -203,7 +204,7 @@ const WinMgr = (() => {
     count() { return wins.size; },
     openCount() { return [...wins.values()].filter(w => !w.minimized).length; },
     findEvidence(id) {
-      id = String(id).toUpperCase();
+      id = String(id);
       return [...wins.values()].find(w => w.evidenceId === id) || null;
     },
     getPos(tag) { return posMemory.get(tag) || null; }
