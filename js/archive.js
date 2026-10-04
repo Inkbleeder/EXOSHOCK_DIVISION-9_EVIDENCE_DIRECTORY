@@ -1,5 +1,5 @@
 "use strict";
-/* archive.js - loads data/evidence.json and provides query helpers.
+/* archive.js - loads js/evidence.js and provides query helpers.
    Records are identified by their visible title. There are no IDs.
    Lookup and search mirror the main site's read / search commands. */
 
@@ -11,20 +11,61 @@ const Archive = (() => {
 
   function norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
 
-  function normalize(e) {
-    const title = e.title || e.filename || "UNTITLED";
+  /* Type is worked out from the file extension, so entries never need one. */
+  const EXT_TYPES = {
+    image:    ["jpg", "jpeg", "png", "webp", "bmp", "svg", "avif"],
+    gif:      ["gif"],
+    video:    ["mp4", "webm", "ogv", "m4v", "mov"],
+    audio:    ["mp3", "wav", "ogg", "oga", "m4a", "aac", "flac"],
+    document: ["txt", "md", "pdf", "html", "htm", "log", "csv"]
+  };
+
+  function extOf(f) {
+    const m = String(f || "").split(/[?#]/)[0].match(/\.([a-z0-9]+)$/i);
+    return m ? m[1].toLowerCase() : "";
+  }
+
+  function inferType(e, file) {
+    const explicit = String(e.type || "").toLowerCase();
+    if (TYPES.includes(explicit)) return explicit;
+    const x = extOf(file);
+    for (const t in EXT_TYPES) if (EXT_TYPES[t].includes(x)) return t;
+    if (!file && e.externalUrl) return "link";
+    return "image";
+  }
+
+  /* "clip.mp4" -> "media/clip.mp4"; anything with a folder or a URL is left alone */
+  function resolveFile(f) {
+    f = String(f || "").trim();
+    if (!f) return "";
+    return (/^(https?:)?\/\//i.test(f) || f.includes("/")) ? f : "media/" + f;
+  }
+
+  /* One spelling per category/subcategory, whatever case or spacing was typed.
+     The first spelling used in the file becomes the display name. */
+  function canon(map, value) {
+    const v = String(value || "").replace(/\s+/g, " ").trim();
+    if (!v) return "";
+    const k = v.toLowerCase();
+    if (!map.has(k)) map.set(k, v);
+    return map.get(k);
+  }
+
+  function normalize(e, cats, subs) {
+    const file = resolveFile(e.file);
+    const title = String(e.title || "").replace(/\s+/g, " ").trim() || (file.split("/").pop() || "UNTITLED");
+    const ord = e.order === undefined || e.order === "" ? NaN : Number(e.order);
     return {
-      key: norm(title).replace(/ /g, "-"),          /* internal only, never shown */
-      filename: e.filename || "",
+      key: norm(title).replace(/ /g, "-") + "|" + norm(e.category) + "|" + norm(e.subcategory),   /* internal only */
+      filename: e.filename || file.split("/").pop() || "",
       title,
-      type: TYPES.includes((e.type || "").toLowerCase()) ? e.type.toLowerCase() : "image",
-      category: e.category || "Uncategorised",
-      subcategory: e.subcategory || "",
-      date: e.date || "",
-      size: e.size || "",
+      type: inferType(e, file),
+      category: canon(cats, e.category) || "Uncategorised",
+      subcategory: canon(subs, e.subcategory),
+      order: Number.isFinite(ord) ? ord : 1e9,
       description: e.description || "",
       tags: (e.tags || []).map(t => String(t).toLowerCase()),
-      file: e.file || "",
+      file,
       related: (e.related || []).map(String),        /* titles */
       hidden: !!e.hidden,
       locked: !!e.locked,
@@ -35,14 +76,29 @@ const Archive = (() => {
     };
   }
 
+  /* Console-only checks, so a typo in evidence.js is easy to find without
+     anything leaking into the in-world terminal. */
+  function validate() {
+    const seen = new Map();
+    items.forEach(e => {
+      const id = e.key;
+      if (seen.has(id)) console.warn('[archive] duplicate record (same title, category and subcategory): "' + e.title + '"');
+      seen.set(id, true);
+      if (!e.file && !e.externalUrl) console.warn('[archive] "' + e.title + '" has no file and no externalUrl');
+      e.related.forEach(t => { if (!find(t).exact) console.warn('[archive] "' + e.title + '" lists a related record that does not exist: "' + t + '"'); });
+    });
+  }
+
+  /* Entries come from js/evidence.js (loaded by a script tag, so this works
+     even when index.html is opened straight from disk). */
   async function load() {
     try {
-      const res = await fetch("data/evidence.json", { cache: "no-store" });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      Object.assign(config, data.config || {});
+      if (typeof D9_EVIDENCE === "undefined") throw new Error("js/evidence.js did not load or has a syntax error (see console)");
+      if (typeof D9_CONFIG !== "undefined") Object.assign(config, D9_CONFIG);
+      const cats = new Map(), subs = new Map();
       items.length = 0;
-      (data.evidence || []).forEach(e => items.push(normalize(e)));   /* JSON order is the master order */
+      D9_EVIDENCE.forEach(e => items.push(normalize(e, cats, subs)));
+      validate();
     } catch (err) {
       loadError = err.message || String(err);
     }
@@ -86,8 +142,9 @@ const Archive = (() => {
 
   function byTitle(title) { return find(title).exact; }
 
-  /* [{category, direct:[items], subs:[{name, items}]}] in first-seen order,
-     the same shape as the main site's database index */
+  /* [{category, direct:[items], subs:[{name, items}]}] - the same shape as the
+     main site's database index. Category order: config.categoryOrder first, then
+     order of first use. Inside a group: order, then title. */
   function group(list) {
     const cats = [];
     list.forEach(e => {
@@ -98,7 +155,11 @@ const Archive = (() => {
       if (!s) c.subs.push(s = { name: e.subcategory, items: [] });
       s.items.push(e);
     });
-    return cats;
+    const cmp = (a, b) => (a.order - b.order) || a.title.localeCompare(b.title);
+    cats.forEach(c => { c.direct.sort(cmp); c.subs.forEach(s => s.items.sort(cmp)); });
+    const pin = (config.categoryOrder || []).map(x => String(x).toLowerCase());
+    const rank = c => { const i = pin.indexOf(c.category.toLowerCase()); return i === -1 ? 1e6 : i; };
+    return cats.map((c, i) => ({ c, i })).sort((a, b) => (rank(a.c) - rank(b.c)) || (a.i - b.i)).map(x => x.c);
   }
 
   /* master order = the order LIST shows, used by NEXT / PREV */
@@ -141,7 +202,7 @@ const Archive = (() => {
     return { list: [], label: String(term).toUpperCase() };
   }
 
-  const SORT_FIELDS = ["title", "type", "date"];
+  const SORT_FIELDS = ["title", "type"];
   function sort(list, field, desc) {
     field = SORT_FIELDS.includes((field || "").toLowerCase()) ? field.toLowerCase() : "title";
     const get = e => String(e[field] || "").toLowerCase();
