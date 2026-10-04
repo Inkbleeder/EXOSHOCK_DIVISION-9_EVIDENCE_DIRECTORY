@@ -16,7 +16,7 @@
 </style>
 <noscript><style>#app, #crt-overlay { visibility:visible; }</style></noscript>
 
-<link rel="stylesheet" href="css/style.css?v=2">
+<link rel="stylesheet" href="css/style.css?v=3">
 </head>
 <body>
 
@@ -39,6 +39,9 @@
       <span id="sys-status">OFFLINE</span>
     </header>
 
+    <!-- Rotating compliance notice -->
+    <div id="notice"><span class="notice-label">NOTICE</span><span id="notice-text"></span></div>
+
     <!-- Output + draggable evidence windows -->
     <div id="desktop">
       <section id="terminal-panel" aria-label="Archive terminal">
@@ -46,18 +49,16 @@
       </section>
     </div>
 
-    <div id="taskbar">
+    <!-- One slim info line: open windows | open file | session + clock -->
+    <div id="infobar">
       <span id="task-label">WINDOWS:</span>
       <div id="task-items"><span id="task-empty">NONE</span></div>
-    </div>
-
-    <div id="statusbar">
       <span id="status-open">NO FILE OPEN</span>
       <span id="status-right"></span>
     </div>
 
     <footer id="terminal-input">
-      <span id="prompt">D9&gt;</span>
+      <span id="prompt">&gt;</span>
       <input id="cmdline" type="text" autocomplete="off" autocapitalize="off"
              autocorrect="off" spellcheck="false" enterkeyhint="go"
              aria-label="Terminal input" autofocus>
@@ -74,11 +75,11 @@
   <audio id="success"  preload="auto"></audio>
   <audio id="ambience" preload="auto"></audio>
 
-  <script src="js/sound.js?v=2"></script>
-  <script src="js/archive.js?v=2"></script>
-  <script src="js/windows.js?v=2"></script>
-  <script src="js/media.js?v=2"></script>
-  <script src="js/terminal.js?v=2"></script>
-  <script src="js/main.js?v=2"></script>
+  <script src="js/sound.js?v=3"></script>
+  <script src="js/archive.js?v=3"></script>
+  <script src="js/windows.js?v=3"></script>
+  <script src="js/media.js?v=3"></script>
+  <script src="js/terminal.js?v=3"></script>
+  <script src="js/main.js?v=3"></script>
 </body>
 </html>
