@@ -133,6 +133,11 @@ body::before{
 
     z-index:2;
 
+    /* re-resolved here (not just on body) so .breach can recolour
+       the whole terminal by overriding the variables */
+    color:var(--green);
+    text-shadow:0 0 6px rgba(var(--green-rgb),.45);
+
 }
 
 html.ready #app{
@@ -437,40 +442,89 @@ html.ready #app{
 }
 
 /* ===========================================================
-   Task bar + status bar
+   Compliance notice (under the header)
    =========================================================== */
 
-#taskbar,
-#statusbar{
+#notice{
     flex:0 0 auto;
     display:flex;
-    justify-content:space-between;
     align-items:center;
-    gap:10px;
+    gap:12px;
     padding:5px 18px;
+    border-bottom:1px solid var(--border);
+    font-size:11px;
+    letter-spacing:2px;
+    white-space:nowrap;
+    overflow:hidden;
+    user-select:none;
+}
+
+.notice-label{
+    flex-shrink:0;
+    padding:0 6px;
+    border:1px solid var(--border);
+    font-weight:bold;
+    opacity:.7;
+}
+
+#notice-text{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    opacity:.6;
+}
+
+#notice.alert{
+    background:rgba(255,85,85,.08);
+}
+
+#notice.alert .notice-label{
+    color:var(--red);
+    border-color:var(--red);
+    opacity:1;
+}
+
+#notice.alert #notice-text{
+    color:var(--red);
+    opacity:.95;
+    animation:blink 1.4s steps(1) infinite;
+}
+
+/* ===========================================================
+   Info line: windows | open file | session + clock
+   (one slim row instead of two stacked bars)
+   =========================================================== */
+
+#infobar{
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:6px 18px;
     border-top:1px solid var(--border);
     font-size:12px;
     letter-spacing:1px;
     white-space:nowrap;
     overflow:hidden;
     user-select:none;
-}
-
-#taskbar{
-    background:rgba(var(--green-rgb),.03);
-    justify-content:flex-start;
-    min-height:30px;
-}
-
-#statusbar{
-    background:rgba(var(--green-rgb),.05);
     opacity:.85;
 }
 
-#task-label{ opacity:.55; }
-#task-items{ display:flex; gap:8px; flex-wrap:wrap; }
+#task-label{ opacity:.55; flex-shrink:0; }
+#task-items{ display:flex; gap:8px; flex-shrink:0; }
 #task-empty{ opacity:.35; }
-#status-open{ overflow:hidden; text-overflow:ellipsis; }
+
+#status-open{
+    flex:1;
+    min-width:0;
+    text-align:center;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+#status-right{
+    flex-shrink:0;
+    opacity:.6;
+}
 
 .task-item{
     font-family:inherit;
@@ -479,7 +533,7 @@ html.ready #app{
     color:var(--green);
     background:transparent;
     border:1px solid var(--border);
-    padding:1px 8px;
+    padding:0 8px;
     cursor:pointer;
     text-shadow:inherit;
 }
@@ -824,10 +878,15 @@ html.ready #app{
 
     #tab-hint{ font-size:.75em; margin-left:6px; }
 
-    #taskbar,
-    #statusbar{ padding:4px 12px; font-size:11px; }
+    #notice{ padding:4px 12px; letter-spacing:1px; }
+
+    .notice-label{ display:none; }
+
+    #infobar{ padding:5px 12px; font-size:11px; gap:10px; }
 
     #task-label{ display:none; }
+
+    #status-right{ display:none; }
 
     .ev-panel{ max-width:none; }
 
@@ -851,4 +910,105 @@ html.ready #app{
 
     .divider{ display:none; }
 
+}
+
+
+/* ===========================================================
+   Boot: breach styling
+   While access is being refused the whole terminal turns red
+   (every colour reads off these variables), then returns to
+   green once the warning has been "bypassed".
+   =========================================================== */
+
+html.ready #app.breach,
+#app.breach{
+    --green:#ff5a4d;
+    --green-rgb:255,90,77;
+    --border:rgba(255,90,77,.45);
+    animation:breach-pulse 1s ease-in-out infinite;
+}
+
+html.ready #app.breach{ animation:breach-pulse 1s ease-in-out infinite; }
+
+@keyframes breach-pulse{
+    0%,100%{ box-shadow:0 0 22px rgba(255,90,77,.25), inset 0 0 35px rgba(255,90,77,.08); }
+    50%    { box-shadow:0 0 42px rgba(255,90,77,.55), inset 0 0 70px rgba(255,90,77,.2); }
+}
+
+#app.glitch,
+html.ready #app.glitch{
+    animation:glitch .15s steps(2) infinite;
+}
+
+@keyframes glitch{
+    0%  { transform:translateX(0); filter:none; }
+    20% { transform:translateX(-3px); filter:hue-rotate(40deg); }
+    40% { transform:translateX(4px); }
+    60% { transform:translateX(-4px); filter:hue-rotate(-40deg); }
+    80% { transform:translateX(2px); }
+    100%{ transform:translateX(0); filter:none; }
+}
+
+@media (prefers-reduced-motion: reduce){
+    #app.breach, #app.glitch, html.ready #app.breach, html.ready #app.glitch{ animation:none; }
+    #notice.alert #notice-text{ animation:none; }
+}
+
+.warn-box{
+    border:2px solid var(--red);
+    background:rgba(255,85,85,.1);
+    color:var(--red);
+    padding:12px 16px;
+    margin:8px 0 6px;
+    max-width:640px;
+    white-space:normal;
+    text-shadow:0 0 8px rgba(255,85,85,.5);
+    animation:help-fade-in .15s ease;
+}
+
+.warn-title{
+    font-weight:bold;
+    font-size:1.15em;
+    letter-spacing:4px;
+    margin-bottom:8px;
+    padding-bottom:6px;
+    border-bottom:1px solid rgba(255,85,85,.5);
+}
+
+.warn-line{
+    font-size:.88em;
+    letter-spacing:1px;
+    line-height:1.6;
+}
+
+/* ===========================================================
+   Corporate touches
+   =========================================================== */
+
+/* faint company mark behind the output */
+#terminal-panel::after{
+    content:"BSLSK";
+    position:absolute;
+    right:4%;
+    bottom:6%;
+    z-index:0;
+    font-size:clamp(60px, 14vw, 190px);
+    font-weight:bold;
+    letter-spacing:.12em;
+    color:var(--green);
+    opacity:.035;
+    text-shadow:none;
+    pointer-events:none;
+    user-select:none;
+}
+
+#terminal-output{ z-index:1; }
+
+.footer-stamp{
+    padding:0 6px;
+    border:1px solid var(--border);
+    font-size:11px;
+    letter-spacing:2px;
+    opacity:.6;
+    white-space:nowrap;
 }
