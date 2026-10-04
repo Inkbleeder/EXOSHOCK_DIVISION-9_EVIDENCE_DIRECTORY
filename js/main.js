@@ -154,6 +154,10 @@ const Main = (() => {
     Term.print("");
     await Term.whenIdle();
 
+    /* index displays straight away */
+    Term.execute("LIST");
+    await Term.whenIdle();
+
     setStatus("UNREGISTERED", false);
     sysStatus.style.color = "var(--yellow)";
     noticeLocked = false;
@@ -287,26 +291,27 @@ const Main = (() => {
     }
   }
 
-  /* deep link: index.html?open=EV-003 auto-opens a record
-     (useful for puzzle redirects from the main site) */
+  /* deep link: index.html?open=Corridor%20Camera%20Loop auto-opens a record by title */
   function deepLink() {
     const p = new URLSearchParams(location.search);
-    const id = (p.get("open") || "").toUpperCase();
-    if (id) {
-      const ev = Archive.byId(id);
+    const q = p.get("open") || "";
+    if (q) {
+      const ev = Archive.byTitle(q);
       if (ev) setTimeout(() => Media.open(ev), 400);
-      else Term.print("DEEP LINK: RECORD " + id + " NOT FOUND IN INDEX.", "err");
+      else Term.print("NO RECORD ON FILE: " + q.toUpperCase(), "err");
     }
   }
 
   async function init() {
     await Archive.load();
+    Archive.loadText();   /* search can read document bodies once these arrive */
     Term.init();
     if (!Archive.loaded) {
       /* index is the single point of failure - be loud about it */
-      Term.print("FATAL: EVIDENCE INDEX FAILED TO LOAD.", "err");
-      Term.print("REASON: " + Archive.loadError, "err");
-      Term.print("Serve the folder over HTTP (see README). The terminal stays online.", "dim");
+      console.error("[archive] evidence index failed to load: " + Archive.loadError +
+                    " - serve the folder over HTTP and check data/evidence.json.");
+      Term.print("ARCHIVE INDEX OFFLINE.", "err");
+      Term.print("RECORDS UNAVAILABLE. CONTACT THE SYSTEM ADMINISTRATOR.", "dim");
       setStatus("DEGRADED", false);
       Term.refocus();
       return;
