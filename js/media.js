@@ -45,6 +45,11 @@ const Media = (() => {
     const bar = document.createElement("div");
     bar.className = "win-footer";
 
+    const stamp = document.createElement("span");
+    stamp.className = "footer-stamp";
+    stamp.textContent = ev.locked ? "RESTRICTED" : "BSLSK // INTERNAL USE ONLY";
+    bar.appendChild(stamp);
+
     const time = document.createElement("span");
     time.className = "footer-time";
     bar.appendChild(time);
