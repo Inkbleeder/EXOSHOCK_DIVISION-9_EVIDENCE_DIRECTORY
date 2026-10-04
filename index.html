@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>BSLSK Division-9 Evidence Archive</title>
+<title>BSLSK Division-9 Evidence Directory</title>
 
 <!-- Inline critical styles: paint the dark background immediately and
      keep the UI invisible until main.js adds the "ready" class once the
@@ -16,7 +16,7 @@
 </style>
 <noscript><style>#app, #crt-overlay { visibility:visible; }</style></noscript>
 
-<link rel="stylesheet" href="css/style.css?v=4">
+<link rel="stylesheet" href="css/style.css?v=6">
 </head>
 <body>
 
@@ -34,7 +34,7 @@
     <header id="terminal-header">
       <span class="status">BSLSK DIVISION-9</span>
       <span class="divider">|</span>
-      <span class="status" id="sys-title">EVIDENCE ARCHIVE</span>
+      <span class="status" id="sys-title">EVIDENCE DIRECTORY</span>
       <span class="divider">|</span>
       <span id="sys-status">OFFLINE</span>
     </header>
@@ -42,11 +42,27 @@
     <!-- Rotating compliance notice -->
     <div id="notice"><span class="notice-label">NOTICE</span><span id="notice-text"></span></div>
 
-    <!-- Output + draggable evidence windows -->
+    <!-- Three columns: terminal (left) | index (always shown) | data flow (right).
+         Evidence windows float over all of it. -->
     <div id="desktop">
-      <section id="terminal-panel" aria-label="Archive terminal">
+      <section id="terminal-panel" aria-label="Directory terminal">
         <div id="terminal-output" aria-live="polite"></div>
+        <footer id="terminal-input">
+          <span id="prompt">&gt;</span>
+          <input id="cmdline" type="text" autocomplete="off" autocapitalize="off"
+                 autocorrect="off" spellcheck="false" enterkeyhint="go"
+                 aria-label="Terminal input" autofocus>
+          <span class="cursor" id="input-cursor" aria-hidden="true"></span>
+          <span id="tab-hint"></span>
+        </footer>
       </section>
+      <section id="list-panel" aria-label="Directory index">
+        <div id="list-output"></div>
+      </section>
+      <aside id="flow-panel" aria-hidden="true">
+        <div id="flow-feed"></div>
+        <pre id="flow-eye"></pre>
+      </aside>
     </div>
 
     <!-- One slim info line: open windows | open file | session + clock -->
@@ -57,15 +73,6 @@
       <span id="status-right"></span>
     </div>
 
-    <footer id="terminal-input">
-      <span id="prompt">&gt;</span>
-      <input id="cmdline" type="text" autocomplete="off" autocapitalize="off"
-             autocorrect="off" spellcheck="false" enterkeyhint="go"
-             aria-label="Terminal input" autofocus>
-      <span class="cursor" id="input-cursor" aria-hidden="true"></span>
-      <span id="tab-hint"></span>
-    </footer>
-
   </main>
 
   <!-- Interface sounds (files are set from js/sound.js) -->
@@ -75,13 +82,14 @@
   <audio id="success"  preload="auto"></audio>
   <audio id="ambience" preload="auto"></audio>
 
-  <script src="js/sound.js?v=4"></script>
+  <script src="js/sound.js?v=6"></script>
   <!-- entries: edit js/evidence.js (timestamp stops the browser serving an old copy) -->
   <script>document.write('<script src="js/evidence.js?t=' + Date.now() + '"><\/script>');</script>
-  <script src="js/archive.js?v=5"></script>
-  <script src="js/windows.js?v=4"></script>
-  <script src="js/media.js?v=4"></script>
-  <script src="js/terminal.js?v=4"></script>
-  <script src="js/main.js?v=4"></script>
+  <script src="js/archive.js?v=6"></script>
+  <script src="js/windows.js?v=6"></script>
+  <script src="js/media.js?v=6"></script>
+  <script src="js/terminal.js?v=6"></script>
+  <script src="js/flow.js?v=1"></script>
+  <script src="js/main.js?v=6"></script>
 </body>
 </html>
