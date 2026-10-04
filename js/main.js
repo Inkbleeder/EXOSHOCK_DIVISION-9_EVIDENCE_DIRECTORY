@@ -18,30 +18,147 @@ const Main = (() => {
     sysStatus.style.color = online ? "var(--blue)" : "";
   }
 
-  /* ---------- boot ---------- */
+  /* ---------- compliance notice ticker ----------
+     A slim line under the header. Normal notices rotate every 20s;
+     the boot sequence takes it over to show a security alert. */
+
+  const noticeEl = document.getElementById("notice");
+  const noticeText = document.getElementById("notice-text");
+
+  const NOTICES = [
+    "ALL ARCHIVE ACCESS IS LOGGED AND REVIEWED BY INTERNAL SECURITY.",
+    "REMINDER: COMPLIANCE IS A SHARED RESPONSIBILITY.",
+    "DO NOT DISCUSS ARCHIVE CONTENTS WITH UNCLEARED PERSONNEL.",
+    "REPORT ANOMALIES TO YOUR SUPERVISOR. DO NOT INVESTIGATE.",
+    "THANK YOU FOR YOUR CONTINUED COOPERATION.",
+    "BSLSK: SECURING A BETTER TOMORROW."
+  ];
+
+  let noticeIdx = 0;
+  let noticeLocked = false;
+
+  function setNotice(text, alert) {
+    noticeText.textContent = text;
+    noticeEl.classList.toggle("alert", !!alert);
+  }
+
+  setInterval(() => {
+    if (noticeLocked) return;
+    noticeIdx = (noticeIdx + 1) % NOTICES.length;
+    setNotice(NOTICES[noticeIdx], false);
+  }, 20000);
+
+  /* ---------- boot: a backdoor into a locked system ----------
+     The terminal is refused at the front door, finds a forgotten
+     maintenance listener, and talks its way past the warning.
+     Any key or click skips the waiting. */
+
+  function glitch(ms) {
+    appEl.classList.add("glitch");
+    setTimeout(() => appEl.classList.remove("glitch"), ms || 450);
+  }
+
+  async function wait(ms) {
+    await Term.whenIdle();
+    if (!skipBoot) await sleep(ms);
+  }
+
+  function warnBox(title, lines) {
+    const box = document.createElement("div");
+    box.className = "warn-box";
+    const t = document.createElement("div");
+    t.className = "warn-title";
+    t.textContent = title;
+    box.appendChild(t);
+    lines.forEach(l => {
+      const d = document.createElement("div");
+      d.className = "warn-line";
+      d.textContent = l;
+      box.appendChild(d);
+    });
+    return box;
+  }
 
   async function bootSequence() {
     skipBoot = false;
+    noticeLocked = true;
     const records = Archive.visible().length;
+    const skip = () => skipBoot;
+
     Term.clear();
-    setStatus("BOOTING", false);
+    appEl.classList.remove("breach", "glitch");
+    setStatus("LOCKED", false);
+    setNotice("RESTRICTED SYSTEM // AUTHORISED PERSONNEL ONLY", true);
     Sound.play("startup");
 
-    Term.print("BSLSK DIVISION-9 // EVIDENCE ARCHIVE  v" + (Archive.config.version || "1.0"), "boot");
-    Term.print("(C)1994 DIVISION 9 - INTERNAL USE ONLY", "boot");
-    Term.print("UNAUTHORIZED ACCESS WILL BE PROSECUTED.", "boot");
+    /* 1. knock on the front door */
+    Term.print("BSLSK DIVISION-9 // EVIDENCE ARCHIVE", "boot");
+    Term.print("INTERNAL RECORDS NETWORK \u2014 NODE D9-EV-07", "boot");
     Term.print("--------------------------------", "boot");
-    await Term.progress("MOUNTING ARCHIVE", () => skipBoot);
-    await Term.progress("INDEXING EVIDENCE", () => skipBoot);
+    await Term.progress("ESTABLISHING LINK", skip);
     Term.print("");
-    Term.print("CONNECTION ESTABLISHED", "success");
+    await wait(300);
+
+    /* 2. refused */
+    appEl.classList.add("breach");
+    glitch(500);
+    Sound.play("error");
+    setNotice("SECURITY ALERT // UNAUTHORISED ACCESS ATTEMPT IN PROGRESS", true);
+    Term.printNode(warnBox("\u26a0  ACCESS DENIED", [
+      "RESTRICTED SYSTEM \u2014 BSLSK DIVISION-9 EVIDENCE DIVISION",
+      "CLEARANCE REQUIRED: LEVEL 9",
+      "CREDENTIALS SUPPLIED: NONE",
+      "THIS ATTEMPT HAS BEEN REFERRED TO INTERNAL SECURITY."
+    ]));
+    await wait(1100);
+
+    /* 3. find the way in */
+    Term.print("");
+    Term.print("> SCANNING FOR OPEN SERVICE PORTS ...", "system");
+    await wait(500);
+    Term.print("> FOUND: MAINT-LISTENER (LEGACY)   TICKET #4471   STATUS: AWAITING REVIEW", "warning");
+    await wait(300);
+    Term.print("> SERVICE CREDENTIALS: EXPIRED.  SERVICE ACCOUNT: STILL ACTIVE.", "warning");
+    await wait(500);
+    Term.print("> ATTEMPTING OVERRIDE ...", "system");
+    await wait(300);
+
+    glitch(600);
+    await Term.progress("INJECTING SESSION TOKEN", skip);
+    glitch(500);
+    await Term.progress("BYPASSING CLEARANCE CHECK", skip);
+    glitch(900);
+    await Term.progress("SUPPRESSING AUDIT TRAIL", skip);
+    Term.print("");
+    await wait(400);
+
+    /* 4. warning overridden */
+    appEl.classList.remove("breach");
+    setStatus("BREACHED", false);
+    sysStatus.style.color = "var(--yellow)";
+    setNotice("WARNING OVERRIDDEN // ACCESS CONTROL BYPASSED", true);
+    Sound.play("success");
+    Term.print("!! WARNING OVERRIDDEN. ACCESS CONTROL BYPASSED.", "warning");
+    Term.print("!! MONITORING OFFLINE FOR THIS SESSION.", "warning");
+    await wait(600);
+
+    /* 5. in */
+    Term.print("");
+    Term.print("BACKDOOR ACCEPTED.  SESSION: UNREGISTERED", "success");
     Term.print(records + " RECORD" + (records === 1 ? "" : "S") + " LOADED", "success");
+    Term.print("");
+    Term.print("ARCHIVE CONTENTS ARE THE PROPERTY OF BSLSK CORP.", "system");
+    Term.print("YOU WERE NEVER HERE.", "warning");
     Term.print("");
     Term.print("TYPE 'HELP' FOR A LIST OF COMMANDS", "system");
     Term.print("");
     await Term.whenIdle();
 
-    setStatus("ONLINE", true);
+    setStatus("UNREGISTERED", false);
+    sysStatus.style.color = "var(--yellow)";
+    noticeLocked = false;
+    noticeIdx = 0;
+    setNotice(NOTICES[0], false);
     Term.refocus();
   }
 
@@ -52,7 +169,7 @@ const Main = (() => {
     const hh = String(now.getHours()).padStart(2, "0");
     const mm = String(now.getMinutes()).padStart(2, "0");
     const ss = String(now.getSeconds()).padStart(2, "0");
-    statusRight.textContent = Archive.items.length + " REC | " + hh + ":" + mm + ":" + ss;
+    statusRight.textContent = "SESSION UNREGISTERED | " + Archive.items.length + " REC | " + hh + ":" + mm + ":" + ss;
   }
 
   /* ---------- idle banner ----------
@@ -72,7 +189,8 @@ const Main = (() => {
     "█████       ████       █ ",
     "                   ████  ",
     "",
-    "EVIDENCE ARCHIVE"
+    "EVIDENCE ARCHIVE",
+    "YOU WERE NEVER HERE."
   ].join("\n");
 
   const idleEl = document.getElementById("idle-banner");
