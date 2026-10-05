@@ -114,25 +114,62 @@ const Flow = (() => {
     add("", L.slice(0, -1)); add("pe", L.slice(-1)); add("pg", M); add("pe", R.slice(0, 1)); add("", R.slice(1));
   }
 
-  /* the eye is an almond: half-width at height dy is A * sqrt(1 - dy / B) */
+  /* The eye's outline, measured from the SVG path itself (icon units, 100 x 64,
+     centre at y = 32). halfW(dy) is how far the outer edge of the drawn eye
+     (stroke included) reaches sideways at dy units above/below the centre, so
+     each row of data stops exactly at the eye's edge instead of at a box. */
+  const SIL = (() => {
+    const pts = [];                                   /* [dy, half-width] along the upper-left curve */
+    const P = [[5, 32], [25, 6], [75, 6], [95, 32]];
+    for (let k = 0; k <= 50; k++) {
+      const t = k / 100, u = 1 - t;
+      const x = u * u * u * P[0][0] + 3 * u * u * t * P[1][0] + 3 * u * t * t * P[2][0] + t * t * t * P[3][0];
+      const y = u * u * u * P[0][1] + 3 * u * u * t * P[1][1] + 3 * u * t * t * P[2][1] + t * t * t * P[3][1];
+      pts.push([32 - y, 50 - x]);
+    }
+    return pts;
+  })();
+  const STROKE = 3;                                   /* half the 6-unit stroke */
+  const SIL_TOP = SIL[SIL.length - 1][0] + STROKE;    /* highest reach of the outline */
+
+  function pathHalfW(dy) {
+    if (dy <= 0) return SIL[0][1];
+    for (let k = 1; k < SIL.length; k++) {
+      if (dy <= SIL[k][0]) {
+        const a = SIL[k - 1], b = SIL[k];
+        const f = (dy - a[0]) / ((b[0] - a[0]) || 1);
+        return a[1] + (b[1] - a[1]) * f;
+      }
+    }
+    return 0;
+  }
+  function halfW(dy) {                                /* outer edge incl. stroke; 0 when clear of the eye */
+    if (dy > SIL_TOP) return 0;
+    return pathHalfW(Math.max(0, dy - STROKE)) + STROKE;
+  }
+
   function applyParting() {
     const H = feed.clientHeight, n = feed.childNodes.length;
     if (!H || !n) return;
     if (!rowH) measure();
     const fr = feed.getBoundingClientRect(), er = eyeEl.getBoundingClientRect();
     const eyeCy = er.top + er.height / 2 - fr.top;
-    const A = er.width / 2 + 6;
-    const B = Math.max(1, (er.height / 2) * Math.max(lid, 0.05) + rowH * 0.6);
-    const padB = 6;
-    const kLo = Math.max(0, Math.floor((H - padB - (eyeCy + B + 2 * rowH)) / rowH));
-    const kHi = Math.min(n - 1, Math.ceil((H - padB - (eyeCy - B - 2 * rowH)) / rowH));
+    const sc = er.width / 100;                        /* pixels per icon unit */
+    if (!(sc > 0)) return;
+    const lidV = Math.max(lid, 0.05);
+    const reach = SIL_TOP * sc * lidV + rowH * 2;
+    const padB = 6, padPx = 3;
+    const kLo = Math.max(0, Math.floor((H - padB - (eyeCy + reach)) / rowH));
+    const kHi = Math.min(n - 1, Math.ceil((H - padB - (eyeCy - reach)) / rowH));
     for (let k = kLo; k <= kHi; k++) {
       const row = feed.childNodes[n - 1 - k];
       if (!row || !row.dataset) continue;
       const cy = H - padB - (k + 0.5) * rowH;
-      const dy = Math.abs(cy - eyeCy);
+      /* nearest edge of this row's text to the eye's centre line, in icon units */
+      const dyPx = Math.max(0, Math.abs(cy - eyeCy) - rowH * 0.4);
+      const hw = halfW(dyPx / sc / lidV);
       let g = 0;
-      if (p > 0.01 && dy < B) g = Math.min(WIDTH, Math.round((2 * A * Math.sqrt(1 - dy / B) * p) / charW));
+      if (p > 0.01 && hw > 0) g = Math.min(WIDTH, Math.ceil((2 * (hw * sc + padPx) * p) / charW));
       const from = Math.floor((WIDTH - g) / 2);
       setGap(row, g > 0 ? from : 0, g > 0 ? from + g : 0);
     }
