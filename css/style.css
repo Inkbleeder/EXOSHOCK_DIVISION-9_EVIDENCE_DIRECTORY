@@ -317,13 +317,12 @@ html.ready #app{
     position:absolute;
     left:50%;
     top:50%;
-    width:calc(100% - 28px);
-    max-width:104px;
+    font-size:12px;               /* same size as the data, so the eye is measured in text columns */
+    width:11ch;                   /* narrower than the 16-character lines: text sits either side */
     transform:translate(-50%,-50%);
     color:var(--green);
     opacity:0;
     pointer-events:none;
-    filter:drop-shadow(0 0 6px var(--green));
 }
 
 #flow-eye svg{ display:block; width:100%; height:auto; overflow:visible; }
@@ -1038,10 +1037,13 @@ html.ready #app.breach{
     --green-rgb:178,107,255;
     --green-dim:#8a4fd1;
     --border:rgba(178,107,255,.45);
-    --red:#b26bff;
     --yellow:#d6b3ff;
     --blue:#c9a0ff;
+    /* --red is left alone on purpose: red is the pirate's voice (Petrify style) */
 }
+
+html.purple #sys-status,
+#app.breach #sys-status{ color:#b26bff; }
 
 .warn-box{
     border:2px solid var(--red);
