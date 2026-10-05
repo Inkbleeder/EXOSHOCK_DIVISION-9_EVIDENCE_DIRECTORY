@@ -294,10 +294,11 @@ html.ready #app{
 #flow-feed{
     position:absolute;
     inset:0;
-    padding:0 8px 6px;
+    padding:0 0 6px;
     display:flex;
     flex-direction:column;
     justify-content:flex-end;
+    align-items:center;
     overflow:hidden;
     font-size:12px;
     line-height:1.45;
@@ -306,28 +307,42 @@ html.ready #app{
             mask-image:linear-gradient(to bottom, transparent 0%, #000 30%);
 }
 
-#flow-feed .f{ opacity:.5; text-shadow:none; }
+#flow-feed .f{ width:16ch; opacity:.5; text-shadow:none; }
+#flow-feed .pg{ visibility:hidden; }   /* text parted by the eye keeps its place but is not drawn */
+#flow-feed .pe{ opacity:.3; }
 
-/* the eye, in the middle of the column */
+/* the eye: a solid icon in the middle of the column, no backdrop.
+   The data parts around it (see flow.js) so it reads like a rock in water. */
 #flow-eye{
     position:absolute;
     left:50%;
     top:50%;
+    width:calc(100% - 28px);
+    max-width:104px;
     transform:translate(-50%,-50%);
-    margin:0;
-    padding:6px 4px;
-    font:bold 12px/1.15 "Courier New", monospace;
-    white-space:pre;
     color:var(--green);
-    background:rgba(2,5,3,.92);
-    text-shadow:0 0 8px var(--green);
     opacity:0;
-    transition:opacity .7s ease;
+    pointer-events:none;
+    filter:drop-shadow(0 0 6px var(--green));
 }
 
-#flow-eye.show{ opacity:1; }
+#flow-eye svg{ display:block; width:100%; height:auto; overflow:visible; }
 
-.line{ min-height:1.2em; }
+.eye-out, .eye-ring{
+    fill:none;
+    stroke:currentColor;
+    stroke-width:6;
+    stroke-linejoin:round;
+    stroke-linecap:round;
+}
+
+#eye-lid{
+    transform-origin:50px 32px;
+    transform:scaleY(.05);
+    transition:transform .22s ease;
+}
+
+#eye-iris{ transition:transform .4s ease; }
 
 /* ===========================================================
    Colour classes (main site names + the archive's older ones)
@@ -1016,6 +1031,7 @@ html.ready #app{
    returns to green once the backdoor is accepted.
    =========================================================== */
 
+html.purple,
 #app.breach,
 html.ready #app.breach{
     --green:#b26bff;
