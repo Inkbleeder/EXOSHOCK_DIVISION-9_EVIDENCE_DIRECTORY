@@ -146,7 +146,17 @@ const Media = (() => {
     const fr = document.createElement("iframe");
     fr.className = "doc-frame";
     fr.src = ev.file;
-    fr.addEventListener("load", () => { overlay.remove(); });
+    fr.addEventListener("load", () => {
+      overlay.remove();
+      try {                                      /* hide the document's own scrollbar; scrolling still works */
+        const d = fr.contentDocument;
+        if (d && d.head) {
+          const st = d.createElement("style");
+          st.textContent = "html,body{scrollbar-width:none;-ms-overflow-style:none}::-webkit-scrollbar{display:none;width:0;height:0}";
+          d.head.appendChild(st);
+        }
+      } catch (e) { /* cross-origin or blocked: leave the default scrollbar */ }
+    });
     /* iframes give no reliable error event - clear the spinner after a wait */
     setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 5000);
     box.appendChild(fr);
