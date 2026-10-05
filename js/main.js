@@ -53,9 +53,11 @@ const Main = (() => {
      maintenance listener, and talks its way past the warning.
      Any key or click skips the waiting. */
 
+  const BOOT_PACE = 0.5;     /* 1 = the old, slower boot */
+
   async function wait(ms) {
     await Term.whenIdle();
-    if (!skipBoot) await sleep(ms);
+    if (!skipBoot) await sleep(ms * BOOT_PACE);
   }
 
   async function bootSequence() {
@@ -72,69 +74,150 @@ const Main = (() => {
     setNotice("RESTRICTED SYSTEM // AUTHORISED PERSONNEL ONLY", true);
     Sound.play("startup");
 
+    /* helpers: fast instant-print bursts, and the pirate's voice (red, bracketed, like Petrify) */
+    const HEXC = "0123456789ABCDEF";
+    const hx = n => { let o = ""; for (let i = 0; i < n; i++) o += HEXC[Math.floor(Math.random() * 16)]; return o; };
+    const say = (text, cls, speed) => Term.print(text, cls, { speed: speed || 3 });   /* fast typing for system lines */
+    const SKULLS = "//-\u2620\uFE0E\u2620\uFE0E";
+    async function burst(lines, gap) {
+      for (const l of lines) {
+        Term.print(l[0], l[1], { instant: true });
+        if (!skipBoot) await sleep(gap);
+      }
+    }
+    async function pirate(text, after) {
+      Term.print("//-[" + text + "]", "error", { speed: 7 });    /* the pirate types a little slower */
+      await wait(after === undefined ? 350 : after);
+    }
+
     /* 1. knock on the front door */
-    Term.print("BSLSK DIVISION-9 // EVIDENCE DIRECTORY", "boot");
-    Term.print("INTERNAL RECORDS NETWORK \u2014 NODE D9-EV-07", "boot");
-    Term.print("--------------------------------", "boot");
-    await Term.progress("ESTABLISHING LINK", skip);
-    Term.print("");
+    say("BSLSK DIVISION-9 // EVIDENCE DIRECTORY", "boot");
+    say("INTERNAL RECORDS NETWORK \u2014 NODE D9-EV-07", "boot");
+    say("--------------------------------", "boot");
+    await Term.progress("ESTABLISHING LINK", skip, 45);
+    await burst([
+      ["[  0.0004] BSLSK-OS 4.11.2 (D9-EV-07) boot", "boot"],
+      ["[  0.0021] cpu0: online", "boot"],
+      ["[  0.0034] mem: 65536K ok", "boot"],
+      ["[  0.0118] mounting /records ... ok", "boot"],
+      ["[  0.0210] checking index integrity ... ok", "boot"],
+      ["[  0.0377] loading clearance table ... ok", "boot"],
+      ["[  0.0412] auth: clearance level 9 required", "boot"],
+      ["[  0.0420] auth: no credentials supplied", "boot"]
+    ], 45);
     await wait(300);
 
-    /* 2. refused - someone else is driving */
+    /* 2. refused */
     Sound.play("error");
     setNotice("SECURITY ALERT // UNAUTHORISED ACCESS ATTEMPT IN PROGRESS", true);
-    Term.print("//-ACCESS DENIED", "error");
-    await wait(500);
-    Term.print("//-RESTRICTED SYSTEM. CLEARANCE REQUIRED: LEVEL 9", "system");
-    await wait(400);
-    Term.print("//-CREDENTIALS SUPPLIED: NONE", "system");
-    await wait(500);
-    Term.print("//-ATTEMPT REFERRED TO INTERNAL SECURITY", "warning");
+    say("//-ACCESS DENIED", "system");
+    await wait(350);
+    say("//-RESTRICTED SYSTEM. CLEARANCE REQUIRED: LEVEL 9", "system");
+    await wait(300);
+    say("//-ATTEMPT REFERRED TO INTERNAL SECURITY", "warning");
     await wait(900);
 
-    /* 3. find the way in */
-    Term.print("");
-    Term.print("//-SCANNING FOR OPEN SERVICE PORTS", "system");
+    /* 3. someone else is on the line - the pirate, like Petrify's unknown signal */
+    say("");
+    say("//-UNKNOWN_SIGNAL_DETECTED", "system");
+    await wait(350);
+    say(" //-SIGNAL_DECODED", "system");
+    await wait(300);
+    say("  //-DISPLAY_DECODED_SIGNAL", "system");
+    await wait(300);
+    say("//-Y/N", "system");
+    await wait(350);
+    say(">\\Y", "warning");
     await wait(500);
-    Term.print("//-FOUND: MAINT-LISTENER (LEGACY)", "system");
-    await wait(300);
-    Term.print("//-TICKET #4471 STATUS: AWAITING REVIEW", "warning");
-    await wait(300);
-    Term.print("//-SERVICE CREDENTIALS: EXPIRED", "system");
-    await wait(300);
-    Term.print("//-SERVICE ACCOUNT: STILL ACTIVE", "warning");
-    await wait(500);
-    Term.print("//-ATTEMPTING OVERRIDE", "system");
-    await wait(400);
+    await pirate("ALRIGHT, OPERATOR. FRONT DOOR'S LOCKED. LUCKILY I KNOW A BACK ONE.", 500);
+    Term.print(SKULLS, "error", { speed: 40 });
+    await wait(700);
 
-    await Term.progress("INJECTING SESSION TOKEN", skip);
-    await Term.progress("BYPASSING CLEARANCE CHECK", skip);
-    await Term.progress("SUPPRESSING AUDIT TRAIL", skip);
-    Term.print("");
+    /* 4. the way in: ports, traces, dumps - fast and relentless */
+    say("");
+    say("//-SCANNING FOR OPEN SERVICE PORTS", "system");
+    const ports = [21, 22, 23, 25, 53, 80, 110, 143, 443, 993, 3306, 5432, 8080];
+    await burst(ports.map(p => ["PORT " + String(p).padStart(4, "0") + "   " + (p % 3 ? "CLOSED" : "FILTERED"), "boot"]), 38);
+    say("PORT 4471   OPEN     MAINT-LISTENER (LEGACY)", "warning");
+    await wait(450);
+    say("//-FOUND: MAINT-LISTENER (LEGACY)", "system");
+    await wait(250);
+    say("//-TICKET #4471 STATUS: AWAITING REVIEW", "warning");
+    await wait(250);
+    say("//-SERVICE CREDENTIALS: EXPIRED", "system");
+    await wait(250);
+    say("//-SERVICE ACCOUNT: STILL ACTIVE", "warning");
+    await wait(500);
+    await pirate("DON'T TOUCH ANYTHING. I'M IN THE WALLS.", 450);
+
+    await burst([
+      ["[DEBUG] init_trace() -> ok", "system"],
+      ["[DEBUG] verifying session token...", "system"],
+      ["[DEBUG] token verification FAILED (0x22)", "warning"],
+      ["[DEBUG] falling back to legacy auth table...", "system"],
+      ["[DEBUG] legacy_table.entries -> 1 record found", "system"],
+      ["[DEBUG] decrypting legacy credentials...", "system"],
+      ["[DEBUG] cipher AES_256 -> key mismatch, retrying", "warning"],
+      ["[DEBUG] fallback cipher accepted -> OK", "system"]
+    ], 70);
+    await wait(300);
+
+    const dump = [];
+    for (let i = 0; i < 26; i++) dump.push(["0x" + hx(8) + "  " + Array.from({ length: 8 }, () => hx(2)).join(" "), "boot"]);
+    await burst(dump, 22);
+    await wait(300);
+
+    say("// NOTE (maintenance):", "warning");
     await wait(400);
+    say("// this listener was never decommissioned.", "warning");
+    await wait(400);
+    say("// ticket #4471 has been open since 1994.", "warning");
+    await wait(400);
+    say("// nobody has looked at it. nobody ever does.", "warning");
+    await wait(700);
+    await pirate("THEY ROTATE THE LOGS EVERY FOUR MINUTES. WE'LL BE LONG GONE.", 400);
+
+    await Term.progress("SPOOFING NODE ADDRESS", skip, 30);
+    await Term.progress("INJECTING SESSION TOKEN", skip, 30);
+    await burst(Array.from({ length: 14 }, () => ["[ 1." + hx(4) + "] net: handshake " + hx(12) + " ok", "boot"]), 26);
+    await Term.progress("BYPASSING CLEARANCE CHECK", skip, 30);
+    await Term.progress("REWRITING ACCESS LOG", skip, 30);
+    await burst(Array.from({ length: 18 }, () => ["audit: purge entry 0x" + hx(6) + " ... ok", "boot"]), 24);
+    await Term.progress("SUPPRESSING AUDIT TRAIL", skip, 30);
+    await wait(500);
+    await pirate("KEEP QUIET.", 250);
+    Term.print(SKULLS, "error", { speed: 40 });
+    await wait(900);
+    say("");
 
     /* 4. warning overridden - back to green */
+    await pirate("THERE. IT'S OPEN.", 500);
     appEl.classList.remove("breach");
     document.documentElement.classList.remove("purple");
     setStatus("BREACHED", false);
     sysStatus.style.color = "var(--yellow)";
     setNotice("WARNING OVERRIDDEN // ACCESS CONTROL BYPASSED", true);
     Sound.play("success");
-    Term.print("//-[WARNING OVERRIDDEN]", "error");
-    await wait(300);
-    Term.print("//-ACCESS CONTROL BYPASSED", "warning");
-    await wait(300);
-    Term.print("//-MONITORING OFFLINE FOR THIS SESSION", "warning");
+    say("//-[WARNING OVERRIDDEN]", "warning");
+    await wait(250);
+    say("//-ACCESS CONTROL BYPASSED", "warning");
+    await wait(250);
+    say("//-MONITORING OFFLINE FOR THIS SESSION", "warning");
     await wait(600);
 
     /* 5. in */
-    Term.print("");
-    Term.print("//-BACKDOOR ACCEPTED. SESSION: UNREGISTERED", "success");
-    Term.print(records + " RECORD" + (records === 1 ? "" : "S") + " LOADED", "success");
-    Term.print("");
-    Term.print("DIRECTORY CONTENTS ARE THE PROPERTY OF BSLSK CORP.", "system");
-    Term.print("YOU WERE NEVER HERE.", "warning");
-    Term.print("");
+    say("");
+    say("//-BACKDOOR ACCEPTED. SESSION: UNREGISTERED", "success");
+    say(records + " RECORD" + (records === 1 ? "" : "S") + " LOADED", "success");
+    say("");
+    say("DIRECTORY CONTENTS ARE THE PROPERTY OF BSLSK CORP.", "system");
+    await wait(600);
+    await pirate("HAVE FUN DIGGING. THIS IS AS FAR AS I CAN GET YOU. GOOD LUCK, AND REMEMBER...", 700);
+    say("YOU WERE NEVER HERE.", "warning");
+    await wait(600);
+    say("//-[;)]", "error");
+    await wait(500);
+    say("");
     Term.print("TYPE 'HELP' FOR A LIST OF COMMANDS", "system");
     Term.print("");
     await Term.whenIdle();
