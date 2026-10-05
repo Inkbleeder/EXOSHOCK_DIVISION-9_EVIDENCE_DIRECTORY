@@ -92,6 +92,15 @@ const Main = (() => {
       await wait(after === undefined ? 700 : after);
     }
 
+    /* 0. a very vague nod to how the session got here */
+    say("INBOUND REDIRECT DETECTED", "boot");
+    await wait(300);
+    say("ORIGIN: UPSTREAM NODE (UNVERIFIED)", "boot");
+    await wait(300);
+    say("FORWARDING SESSION ...", "boot");
+    await wait(600);
+    Term.print("");
+
     /* 1. knock on the front door */
     say("BSLSK DIVISION-9 // EVIDENCE DIRECTORY", "boot");
     say("INTERNAL RECORDS NETWORK \u2014 NODE D9-EV-07", "boot");
@@ -219,7 +228,6 @@ const Main = (() => {
     await pirate("HAVE FUN DIGGING. THIS IS AS FAR AS I CAN GET YOU. GOOD LUCK, AND REMEMBER...", 1000);
     Term.print("YOU WERE NEVER HERE.", "warning");
     await wait(900);
-    await pirate("I WAS NEVER HERE EITHER. ;)", 900);
     Term.print(SKULLS_BIG, "error", { speed: 40 });
     await wait(600);
     Term.print(SKULLS_BIG, "error", { speed: 40 });
