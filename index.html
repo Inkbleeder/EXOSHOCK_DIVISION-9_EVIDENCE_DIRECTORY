@@ -16,7 +16,7 @@
 </style>
 <noscript><style>#app, #crt-overlay { visibility:visible; }</style></noscript>
 
-<link rel="stylesheet" href="css/style.css?v=8">
+<link rel="stylesheet" href="css/style.css?v=9">
 </head>
 <body>
 
@@ -60,16 +60,8 @@
         <div id="list-output"></div>
       </section>
       <aside id="flow-panel" aria-hidden="true">
+        <canvas id="flow-canvas"></canvas>
         <div id="flow-feed"></div>
-        <div id="flow-eye">
-          <svg viewBox="0 0 100 64" xmlns="http://www.w3.org/2000/svg" focusable="false">
-            <defs><clipPath id="eye-clip"><path d="M5 32 C25 6 75 6 95 32 C75 58 25 58 5 32 Z"/></clipPath></defs>
-            <g id="eye-lid">
-              <path class="eye-out" d="M5 32 C25 6 75 6 95 32 C75 58 25 58 5 32 Z"/>
-              <g clip-path="url(#eye-clip)"><g id="eye-iris"><circle class="eye-ring" cx="50" cy="32" r="12.5"/></g></g>
-            </g>
-          </svg>
-        </div>
       </aside>
     </div>
 
@@ -97,7 +89,7 @@
   <script src="js/windows.js?v=6"></script>
   <script src="js/media.js?v=6"></script>
   <script src="js/terminal.js?v=7"></script>
-  <script src="js/flow.js?v=3"></script>
-  <script src="js/main.js?v=9"></script>
+  <script src="js/flow.js?v=4"></script>
+  <script src="js/main.js?v=10"></script>
 </body>
 </html>
