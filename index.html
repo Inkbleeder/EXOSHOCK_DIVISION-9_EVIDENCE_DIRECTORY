@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="purple">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -16,7 +16,7 @@
 </style>
 <noscript><style>#app, #crt-overlay { visibility:visible; }</style></noscript>
 
-<link rel="stylesheet" href="css/style.css?v=6">
+<link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
 
@@ -61,7 +61,15 @@
       </section>
       <aside id="flow-panel" aria-hidden="true">
         <div id="flow-feed"></div>
-        <pre id="flow-eye"></pre>
+        <div id="flow-eye">
+          <svg viewBox="0 0 100 64" xmlns="http://www.w3.org/2000/svg" focusable="false">
+            <defs><clipPath id="eye-clip"><path d="M5 32 C25 6 75 6 95 32 C75 58 25 58 5 32 Z"/></clipPath></defs>
+            <g id="eye-lid">
+              <path class="eye-out" d="M5 32 C25 6 75 6 95 32 C75 58 25 58 5 32 Z"/>
+              <g clip-path="url(#eye-clip)"><g id="eye-iris"><circle class="eye-ring" cx="50" cy="32" r="12.5"/></g></g>
+            </g>
+          </svg>
+        </div>
       </aside>
     </div>
 
@@ -89,7 +97,7 @@
   <script src="js/windows.js?v=6"></script>
   <script src="js/media.js?v=6"></script>
   <script src="js/terminal.js?v=6"></script>
-  <script src="js/flow.js?v=1"></script>
-  <script src="js/main.js?v=6"></script>
+  <script src="js/flow.js?v=2"></script>
+  <script src="js/main.js?v=7"></script>
 </body>
 </html>
