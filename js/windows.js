@@ -1,6 +1,31 @@
 "use strict";
 /* windows.js - DOS-style draggable window manager with taskbar. */
 
+/* Faint fade on the top / bottom edge of a scrollable pane whenever there is
+   more content in that direction (the scrollbars are hidden, so this is the
+   only hint). Sets .fade-up / .fade-down; the look lives in style.css. */
+const ScrollFade = (() => {
+  function attach(el) {
+    if (!el || el._fade) return;
+    el._fade = true;
+    let queued = false;
+    const update = () => {
+      queued = false;
+      const up = el.scrollTop > 4;
+      const down = el.scrollTop + el.clientHeight < el.scrollHeight - 4;
+      el.classList.toggle("fade-up", up);
+      el.classList.toggle("fade-down", down);
+    };
+    const queue = () => { if (!queued) { queued = true; requestAnimationFrame(update); } };
+    el.addEventListener("scroll", queue, { passive: true });
+    try { if (window.ResizeObserver) new ResizeObserver(queue).observe(el); } catch (e) {}
+    try { new MutationObserver(queue).observe(el, { childList: true, subtree: true }); } catch (e) {}
+    window.addEventListener("resize", queue);
+    queue();
+  }
+  return { attach };
+})();
+
 const WinMgr = (() => {
   const desktop = document.getElementById("desktop");
   const taskItems = document.getElementById("task-items");
@@ -164,6 +189,7 @@ const WinMgr = (() => {
     const body = document.createElement("div");
     body.className = "win-body";
     if (opts.content) body.appendChild(opts.content);
+    ScrollFade.attach(body);
 
     el.appendChild(header);
     el.appendChild(body);
