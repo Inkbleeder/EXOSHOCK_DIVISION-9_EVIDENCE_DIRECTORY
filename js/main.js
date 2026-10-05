@@ -78,7 +78,9 @@ const Main = (() => {
     const HEXC = "0123456789ABCDEF";
     const hx = n => { let o = ""; for (let i = 0; i < n; i++) o += HEXC[Math.floor(Math.random() * 16)]; return o; };
     const say = (text, cls, speed) => Term.print(text, cls, { speed: speed || 3 });   /* fast typing for system lines */
-    const SKULLS = "//-\u2620\uFE0E\u2620\uFE0E";
+    const SK = "\u2620\uFE0E";
+    const SKULLS = "//-" + SK.repeat(3);
+    const SKULLS_BIG = "//-" + SK.repeat(7);
     async function burst(lines, gap) {
       for (const l of lines) {
         Term.print(l[0], l[1], { instant: true });
@@ -86,8 +88,8 @@ const Main = (() => {
       }
     }
     async function pirate(text, after) {
-      Term.print("//-[" + text + "]", "error", { speed: 7 });    /* the pirate types a little slower */
-      await wait(after === undefined ? 350 : after);
+      Term.print("//-[" + text + "]", "error", { speed: 26 });   /* the pirate types slowly: the scroll slows down when he talks */
+      await wait(after === undefined ? 700 : after);
     }
 
     /* 1. knock on the front door */
@@ -148,7 +150,9 @@ const Main = (() => {
     await wait(250);
     say("//-SERVICE ACCOUNT: STILL ACTIVE", "warning");
     await wait(500);
-    await pirate("DON'T TOUCH ANYTHING. I'M IN THE WALLS.", 450);
+    await pirate("DON'T TOUCH ANYTHING. I'M IN THE WALLS.", 800);
+    Term.print(SKULLS, "error", { speed: 40 });
+    await wait(500);
 
     await burst([
       ["[DEBUG] init_trace() -> ok", "system"],
@@ -171,7 +175,7 @@ const Main = (() => {
     await wait(400);
     say("// this listener was never decommissioned.", "warning");
     await wait(400);
-    say("// ticket #4471 has been open since 1994.", "warning");
+    say("// ticket #4471 has never been closed.", "warning");
     await wait(400);
     say("// nobody has looked at it. nobody ever does.", "warning");
     await wait(700);
@@ -185,8 +189,8 @@ const Main = (() => {
     await burst(Array.from({ length: 18 }, () => ["audit: purge entry 0x" + hx(6) + " ... ok", "boot"]), 24);
     await Term.progress("SUPPRESSING AUDIT TRAIL", skip, 30);
     await wait(500);
-    await pirate("KEEP QUIET.", 250);
-    Term.print(SKULLS, "error", { speed: 40 });
+    await pirate("KEEP QUIET.", 600);
+    Term.print(SKULLS_BIG, "error", { speed: 40 });
     await wait(900);
     say("");
 
@@ -212,12 +216,16 @@ const Main = (() => {
     say("");
     say("DIRECTORY CONTENTS ARE THE PROPERTY OF BSLSK CORP.", "system");
     await wait(600);
-    await pirate("HAVE FUN DIGGING. THIS IS AS FAR AS I CAN GET YOU. GOOD LUCK, AND REMEMBER...", 700);
-    say("YOU WERE NEVER HERE.", "warning");
+    await pirate("HAVE FUN DIGGING. THIS IS AS FAR AS I CAN GET YOU. GOOD LUCK, AND REMEMBER...", 1000);
+    Term.print("YOU WERE NEVER HERE.", "warning");
+    await wait(900);
+    await pirate("I WAS NEVER HERE EITHER. ;)", 900);
+    Term.print(SKULLS_BIG, "error", { speed: 40 });
     await wait(600);
-    say("//-[;)]", "error");
+    Term.print(SKULLS_BIG, "error", { speed: 40 });
     await wait(500);
-    say("");
+    await pirate("===SIGNAL_LOST===", 700);
+    Term.print("");
     Term.print("TYPE 'HELP' FOR A LIST OF COMMANDS", "system");
     Term.print("");
     await Term.whenIdle();
