@@ -69,7 +69,7 @@ const Term = (() => {
             if (fast) { it.node.data = it.text; break; }
             it.node.data = it.text.slice(0, i);
             scroll();
-            await sleep(TYPE_SPEED);
+            await sleep(it.speed || TYPE_SPEED);
           }
         }
       }
@@ -92,6 +92,7 @@ const Term = (() => {
 
   function print(text, cls, opts) {
     const instant = !!(opts && opts.instant);
+    const speed = opts && opts.speed ? opts.speed : 0;   /* ms per character, overrides the default */
     const lines = String(text).split("\n");
     let last = null;
     lines.forEach(l => {
@@ -100,7 +101,7 @@ const Term = (() => {
       d.appendChild(node);
       d.style.display = "none";
       out.appendChild(d);
-      enqueue({ el: d, node, text: l === "" ? "\u00a0" : l, instant });
+      enqueue({ el: d, node, text: l === "" ? "\u00a0" : l, instant, speed });
       last = d;
     });
     if (cls === "err" || cls === "error") {
@@ -132,14 +133,14 @@ const Term = (() => {
   function echo(text) { print(promptEl.textContent + " " + text, "echo", { instant: true }); }
 
   /* progress bar line, used by the boot sequence */
-  async function progress(text, skipFn) {
+  async function progress(text, skipFn, stepMs) {
     await whenIdle();
     const d = mk("div", "line system");
     out.appendChild(d);
     for (let i = 0; i <= 10; i++) {
       d.textContent = text + " [" + "\u2588".repeat(i) + "\u2591".repeat(10 - i) + "]";
       scroll();
-      if (!(skipFn && skipFn())) await sleep(100);
+      if (!(skipFn && skipFn())) await sleep(stepMs || 100);
     }
   }
 
