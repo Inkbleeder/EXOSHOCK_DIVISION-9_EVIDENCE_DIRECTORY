@@ -385,6 +385,8 @@ const Main = (() => {
   }
 
   async function init() {
+    ScrollFade.attach(document.getElementById("terminal-output"));
+    ScrollFade.attach(document.getElementById("list-output"));
     await Archive.load();
     Archive.loadText();   /* search can read document bodies once these arrive */
     Term.init();
