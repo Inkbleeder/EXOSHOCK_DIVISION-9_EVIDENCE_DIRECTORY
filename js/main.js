@@ -66,7 +66,8 @@ const Main = (() => {
 
     Term.clear();
     Term.clearIndex("//-AWAITING INDEX");
-    appEl.classList.remove("breach");
+    document.documentElement.classList.add("purple");   /* purple before a single line prints */
+    appEl.classList.add("breach");
     setStatus("LOCKED", false);
     setNotice("RESTRICTED SYSTEM // AUTHORISED PERSONNEL ONLY", true);
     Sound.play("startup");
@@ -79,8 +80,7 @@ const Main = (() => {
     Term.print("");
     await wait(300);
 
-    /* 2. refused - the terminal turns purple: someone else is driving */
-    appEl.classList.add("breach");
+    /* 2. refused - someone else is driving */
     Sound.play("error");
     setNotice("SECURITY ALERT // UNAUTHORISED ACCESS ATTEMPT IN PROGRESS", true);
     Term.print("//-ACCESS DENIED", "error");
@@ -113,8 +113,9 @@ const Main = (() => {
     Term.print("");
     await wait(400);
 
-    /* 4. warning overridden */
+    /* 4. warning overridden - back to green */
     appEl.classList.remove("breach");
+    document.documentElement.classList.remove("purple");
     setStatus("BREACHED", false);
     sysStatus.style.color = "var(--yellow)";
     setNotice("WARNING OVERRIDDEN // ACCESS CONTROL BYPASSED", true);
@@ -292,6 +293,8 @@ const Main = (() => {
       /* index is the single point of failure - be loud about it */
       console.error("[archive] evidence index failed to load: " + Archive.loadError +
                     " - serve the folder over HTTP and check js/evidence.js.");
+      document.documentElement.classList.remove("purple");
+      appEl.classList.remove("breach");
       Term.clearIndex("//-DIRECTORY INDEX UNAVAILABLE");
       Term.print("ARCHIVE INDEX OFFLINE.", "err");
       Term.print("RECORDS UNAVAILABLE. CONTACT THE SYSTEM ADMINISTRATOR.", "dim");
