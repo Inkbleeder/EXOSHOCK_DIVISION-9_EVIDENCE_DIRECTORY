@@ -308,40 +308,19 @@ html.ready #app{
 }
 
 #flow-feed .f{ width:16ch; opacity:.5; text-shadow:none; }
-#flow-feed .pg{ visibility:hidden; }   /* text parted by the eye keeps its place but is not drawn */
-#flow-feed .pe{ opacity:.3; }
 
-/* the eye: a solid icon in the middle of the column, no backdrop.
-   The data parts around it (see flow.js) so it reads like a rock in water. */
-#flow-eye{
+
+/* the data column is painted on a canvas (flow.js); the text of the stream is
+   also kept, invisible, in #flow-feed. Without canvas the plain text shows. */
+#flow-canvas{
     position:absolute;
-    left:50%;
-    top:50%;
-    font-size:12px;               /* same size as the data, so the eye is measured in text columns */
-    width:11ch;                   /* narrower than the 16-character lines: text sits either side */
-    transform:translate(-50%,-50%);
-    color:var(--green);
-    opacity:0;
-    pointer-events:none;
+    inset:0;
+    width:100%;
+    height:100%;
+    display:block;
 }
 
-#flow-eye svg{ display:block; width:100%; height:auto; overflow:visible; }
-
-.eye-out, .eye-ring{
-    fill:none;
-    stroke:currentColor;
-    stroke-width:6;
-    stroke-linejoin:round;
-    stroke-linecap:round;
-}
-
-#eye-lid{
-    transform-origin:50px 32px;
-    transform:scaleY(.05);
-    transition:transform .22s ease;
-}
-
-#eye-iris{ transition:transform .4s ease; }
+#flow-panel.canvas #flow-feed{ visibility:hidden; }
 
 /* ===========================================================
    Colour classes (main site names + the archive's older ones)
