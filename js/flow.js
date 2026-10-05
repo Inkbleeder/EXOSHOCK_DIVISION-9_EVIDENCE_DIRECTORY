@@ -1,32 +1,42 @@
 "use strict";
 /* flow.js - the scrolling data column on the right, plus the ghost eye.
    Purely decorative: nothing else depends on it, and if anything in here
-   throws, the rest of the site carries on (everything is wrapped).
+   throws, the rest of the site carries on.
 
-   The column prints endless corporate-looking noise (hex, numbers, letters,
-   status tokens). Hidden in it, repeating every cycle between two rows of
-   "=", is a ciphertext block (CIPHER_LINES). Its layers are: base64, then
-   reversed, then a Vigenere shift. Edit CIPHER_LINES to change the message.
+   HOW IT IS DRAWN
+   The whole column is painted on one <canvas>. The data scrolls smoothly
+   and continuously; the eye is a stationary shape in the middle of that
+   stream. Wherever the eye's lines are, the text is erased in a thin halo
+   around them, so the stream appears to run into the eye and around its
+   edges. The text stays visible inside the eye (no backdrop): the eye is
+   carved out of the stream, not placed over it. When the eye fades in/out
+   the carving fades with it.
 
-   The eye: every so often a solid eye icon (the SVG in index.html) fades in
-   at the middle of the column, opens, looks around, closes and fades out.
-   While it is there the data parts around it, row by row, like water round a
-   rock. To use a different icon, replace the <svg id="flow-eye"> markup in
-   index.html (keep the ids eye-lid and eye-iris) and adjust the numbers in
-   LOOK below. */
+   THE CIPHER
+   Between two rows of "=", the stream repeats CIPHER_LINES every cycle.
+   Layers: base64, then reversed, then a Vigenere shift. Edit CIPHER_LINES
+   to change the message. A hidden copy of the stream is kept in the page
+   (#flow-feed) so the lines also exist in the DOM.
+
+   THE EYE
+   Drawn from the same shape as the old SVG icon (100 x 64 units). LOOK
+   sets how far the iris travels. If canvas is unavailable the column falls
+   back to a plain text scroll with no eye. */
 
 const Flow = (() => {
-  const panel = document.getElementById("flow-panel");
-  const feed  = document.getElementById("flow-feed");
-  const eyeEl = document.getElementById("flow-eye");
-  const lidEl = document.getElementById("eye-lid");
-  const irisEl = document.getElementById("eye-iris");
+  const panel  = document.getElementById("flow-panel");
+  const feed   = document.getElementById("flow-feed");
+  const canvas = document.getElementById("flow-canvas");
   if (!panel || !feed) return { start() {}, stop() {} };
 
   const reduced = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const WIDTH = 16;            /* characters per line */
-  const MAX_LINES = 90;        /* DOM cap */
-  const TICK_MS = reduced ? 1400 : 320;
+  const MAX_LINES = 90;        /* cap on the hidden DOM copy and the line buffer */
+  const TICK_MS = reduced ? 1400 : 320;     /* time to scroll one line */
+  const FONT = '12px "Courier New", Courier, monospace';
+  const TEXT_ALPHA = 0.5;
+  const HALO_PX = 2.5;         /* gap of cleared stream around the eye's lines */
+  const LOOK = { x: 10, y: 3 };             /* iris travel, in icon units */
 
   /* base64( reverse( vigenere(message) ) ), split into WIDTH-char lines */
   const CIPHER_LINES = [
@@ -43,7 +53,6 @@ const Flow = (() => {
   const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   const TOKENS = ["SYNC OK", "NODE 07 ACK", "PKT 4471 OK", "HASH VERIFIED", "RELAY 3 UP", "CRC PASS",
                   "SEQ RESET", "LINK STABLE", "BUFFER FLUSH", "AUTH 0 / 0", "QUEUE EMPTY", "LATENCY 12ms"];
-
   const pick = s => s[Math.floor(Math.random() * s.length)];
   const rnd = (set, n) => { let o = ""; for (let i = 0; i < n; i++) o += pick(set); return o; };
 
@@ -57,173 +66,171 @@ const Flow = (() => {
     return pick(TOKENS);
   }
 
-  /* ---------- stream ---------- */
-  let timer = null, running = false, queue = [];
+  /* ---------- the stream (newest line first) ---------- */
+  const lines = [];
+  let queue = [];
 
-  function refill() {
-    const run = 24 + Math.floor(Math.random() * 40);
-    for (let i = 0; i < run; i++) queue.push({ t: noiseLine() });
-    queue.push({ t: FENCE, c: true });
-    CIPHER_LINES.forEach(l => queue.push({ t: l, c: true }));
-    queue.push({ t: FENCE, c: true });
+  function nextLine() {
+    if (!queue.length) {
+      const run = 24 + Math.floor(Math.random() * 40);
+      for (let i = 0; i < run; i++) queue.push({ t: noiseLine() });
+      queue.push({ t: FENCE, c: true });
+      CIPHER_LINES.forEach(l => queue.push({ t: l, c: true }));
+      queue.push({ t: FENCE, c: true });
+    }
+    return queue.shift();
   }
 
-  function emit() {
+  function pushLine() {
     try {
-      if (!queue.length) refill();
-      const it = queue.shift();
-      const d = document.createElement("div");
+      const it = nextLine();
+      lines.unshift(it);
+      if (lines.length > MAX_LINES) lines.pop();
+      const d = document.createElement("div");           /* hidden DOM copy of the stream */
       d.className = "f" + (it.c ? " c" : "");
-      d.dataset.t = it.t;
       d.textContent = it.t;
       feed.appendChild(d);
       while (feed.childNodes.length > MAX_LINES) feed.removeChild(feed.firstChild);
     } catch (e) { /* decorative only */ }
-    if (running) timer = setTimeout(emit, TICK_MS);
   }
 
-  /* ---------- parting the data around the eye ---------- */
-  let p = 0;               /* eye presence 0..1 (opacity and size of the parting) */
-  let lid = 0.05;          /* eyelid openness 0.05 (shut) .. 1 */
-  let partActive = false;
-  let rowH = 0, charW = 0;
+  /* ---------- canvas ---------- */
+  let ctx = null;
+  try { ctx = canvas && canvas.getContext ? canvas.getContext("2d") : null; } catch (e) { ctx = null; }
 
-  function measure() {
-    const lh = parseFloat(getComputedStyle(feed).lineHeight);
-    rowH = isFinite(lh) && lh > 0 ? lh : 17.4;
-    const probe = document.createElement("div");
-    probe.className = "f";
-    probe.style.cssText = "position:absolute;visibility:hidden;width:auto";
-    probe.textContent = "0".repeat(WIDTH);
-    feed.appendChild(probe);
-    const w = probe.getBoundingClientRect().width;
-    feed.removeChild(probe);
-    charW = w > 0 ? w / WIDTH : 7.2;
+  let W = 0, H = 0, cw = 7.2, rh = 17.4, ink = "#00ff66", inkAt = 0;
+  const PAD_B = 6;
+
+  function resize() {
+    if (!ctx) return;
+    W = Math.floor(panel.clientWidth); H = Math.floor(panel.clientHeight);
+    if (!W || !H) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.font = FONT;
+    const m = ctx.measureText("0".repeat(WIDTH)).width;
+    if (m > 0) cw = m / WIDTH;
+    rh = 12 * 1.45;
   }
 
-  /* draw a row with chars [from,to) hidden; the text itself is untouched */
-  function setGap(el, from, to) {
-    const key = from >= to ? "" : from + "-" + to;
-    if (el._g === key) return;
-    el._g = key;
-    const t = el.dataset.t || "";
-    el.textContent = "";
-    if (!key) { el.textContent = t; return; }
-    const add = (cls, txt) => { const s = document.createElement("span"); if (cls) s.className = cls; s.textContent = txt; el.appendChild(s); };
-    const L = t.slice(0, from), M = t.slice(from, to), R = t.slice(to);
-    add("", L.slice(0, -1)); add("pe", L.slice(-1)); add("pg", M); add("pe", R.slice(0, 1)); add("", R.slice(1));
+  function readInk(now) {
+    if (now - inkAt < 500) return;
+    inkAt = now;
+    try {
+      const v = getComputedStyle(document.documentElement).getPropertyValue("--green").trim();
+      if (v) ink = v;
+    } catch (e) { /* keep the last colour */ }
   }
 
-  /* The eye's outline, measured from the SVG path itself (icon units, 100 x 64,
-     centre at y = 32). halfW(dy) is how far the outer edge of the drawn eye
-     (stroke included) reaches sideways at dy units above/below the centre, so
-     each row of data stops exactly at the eye's edge instead of at a box. */
-  const SIL = (() => {
-    const pts = [];                                   /* [dy, half-width] along the upper-left curve */
-    const P = [[5, 32], [25, 6], [75, 6], [95, 32]];
-    for (let k = 0; k <= 50; k++) {
-      const t = k / 100, u = 1 - t;
-      const x = u * u * u * P[0][0] + 3 * u * u * t * P[1][0] + 3 * u * t * t * P[2][0] + t * t * t * P[3][0];
-      const y = u * u * u * P[0][1] + 3 * u * u * t * P[1][1] + 3 * u * t * t * P[2][1] + t * t * t * P[3][1];
-      pts.push([32 - y, 50 - x]);
+  /* ---------- the eye: state ---------- */
+  const ALMOND = (typeof Path2D !== "undefined") ? new Path2D("M5 32 C25 6 75 6 95 32 C75 58 25 58 5 32 Z") : null;
+  let p = 0, pT = 0;               /* presence (fade) and its target */
+  let lid = 0.05, lidT = 0.05;     /* eyelid openness */
+  let ix = 0, iy = 0, tx = 0, ty = 0;   /* iris offset and target */
+
+  function ease(cur, target, dt, tau) { return cur + (target - cur) * (1 - Math.exp(-dt / tau)); }
+
+  function stepEye(dt) {
+    lid = ease(lid, lidT, dt, 70);
+    ix = ease(ix, tx, dt, 110);
+    iy = ease(iy, ty, dt, 110);
+    const d = pT - p, rate = dt / (pT > p ? 900 : 1000);
+    p = Math.abs(d) <= rate ? pT : p + Math.sign(d) * rate;
+  }
+
+  /* one pass over the eye's lines. carve = erase the stream around them, else draw them */
+  function eyePass(carve, sc) {
+    ctx.globalCompositeOperation = carve ? "destination-out" : "source-over";
+    ctx.globalAlpha = p;
+    ctx.strokeStyle = carve ? "#000" : ink;
+    ctx.lineWidth = carve ? 6 + (2 * HALO_PX) / sc : 6;
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.stroke(ALMOND);
+    ctx.save();
+    ctx.clip(ALMOND);                                  /* the lid hides whatever of the iris it covers */
+    ctx.translate(ix, iy);
+    ctx.beginPath(); ctx.arc(50, 32, 12.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawEye() {
+    const eyeW = Math.min(W - 24, 104), sc = eyeW / 100;
+    ctx.save();
+    ctx.translate(W / 2 - eyeW / 2, H / 2 - 32 * sc);
+    ctx.scale(sc, sc);
+    ctx.translate(50, 32); ctx.scale(1, Math.max(lid, 0.05)); ctx.translate(-50, -32);
+    eyePass(true, sc);                                 /* clear a thin halo in the data... */
+    eyePass(false, sc);                                /* ...and draw the eye into it */
+    ctx.restore();
+  }
+
+  /* ---------- frame loop ---------- */
+  let running = false, rafId = 0, last = 0, phase = 0, timer = null, eyeTimer = null;
+
+  function draw(now) {
+    if (!ctx || !W || !H) return;
+    readInk(now);
+    ctx.setTransform(Math.min(window.devicePixelRatio || 1, 2), 0, 0, Math.min(window.devicePixelRatio || 1, 2), 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+    ctx.clearRect(0, 0, W, H);
+
+    ctx.font = FONT; ctx.textBaseline = "middle"; ctx.fillStyle = ink; ctx.globalAlpha = TEXT_ALPHA;
+    const x0 = Math.round((W - WIDTH * cw) / 2);
+    for (let i = 0; i < lines.length; i++) {
+      const cy = H - PAD_B + rh / 2 - phase - (i + 1) * rh + rh;     /* newest line rises in from the bottom */
+      if (cy < -rh) break;
+      if (cy > H + rh) continue;
+      ctx.fillText(lines[i].t, x0, cy);
     }
-    return pts;
-  })();
-  const STROKE = 3;                                   /* half the 6-unit stroke */
-  const SIL_TOP = SIL[SIL.length - 1][0] + STROKE;    /* highest reach of the outline */
 
-  function pathHalfW(dy) {
-    if (dy <= 0) return SIL[0][1];
-    for (let k = 1; k < SIL.length; k++) {
-      if (dy <= SIL[k][0]) {
-        const a = SIL[k - 1], b = SIL[k];
-        const f = (dy - a[0]) / ((b[0] - a[0]) || 1);
-        return a[1] + (b[1] - a[1]) * f;
-      }
-    }
-    return 0;
-  }
-  function halfW(dy) {                                /* outer edge incl. stroke; 0 when clear of the eye */
-    if (dy > SIL_TOP) return 0;
-    return pathHalfW(Math.max(0, dy - STROKE)) + STROKE;
+    /* fade the top of the column out */
+    ctx.globalCompositeOperation = "destination-out"; ctx.globalAlpha = 1;
+    const g = ctx.createLinearGradient(0, 0, 0, H * 0.3);
+    g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H * 0.3);
+    ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+
+    if (p > 0.003 && ALMOND) drawEye();
   }
 
-  function applyParting() {
-    const H = feed.clientHeight, n = feed.childNodes.length;
-    if (!H || !n) return;
-    if (!rowH) measure();
-    const fr = feed.getBoundingClientRect(), er = eyeEl.getBoundingClientRect();
-    const eyeCy = er.top + er.height / 2 - fr.top;
-    const sc = er.width / 100;                        /* pixels per icon unit */
-    if (!(sc > 0)) return;
-    const lidV = Math.max(lid, 0.05);
-    const reach = SIL_TOP * sc * lidV + rowH * 2;
-    const padB = 6, padPx = 3;
-    const kLo = Math.max(0, Math.floor((H - padB - (eyeCy + reach)) / rowH));
-    const kHi = Math.min(n - 1, Math.ceil((H - padB - (eyeCy - reach)) / rowH));
-    for (let k = kLo; k <= kHi; k++) {
-      const row = feed.childNodes[n - 1 - k];
-      if (!row || !row.dataset) continue;
-      const cy = H - padB - (k + 0.5) * rowH;
-      /* nearest edge of this row's text to the eye's centre line, in icon units */
-      const dyPx = Math.max(0, Math.abs(cy - eyeCy) - rowH * 0.4);
-      const hw = halfW(dyPx / sc / lidV);
-      let g = 0;
-      if (p > 0.01 && hw > 0) g = Math.min(WIDTH, Math.ceil((2 * (hw * sc + padPx) * p) / charW));
-      const from = Math.floor((WIDTH - g) / 2);
-      setGap(row, g > 0 ? from : 0, g > 0 ? from + g : 0);
-    }
+  function frame(now) {
+    if (!running) return;
+    rafId = requestAnimationFrame(frame);
+    const dt = Math.min(now - (last || now), 100); last = now;
+    try {
+      phase += dt * rh / TICK_MS;
+      while (phase >= rh) { phase -= rh; pushLine(); }
+      stepEye(dt);
+      draw(now);
+    } catch (e) { /* decorative only */ }
   }
 
-  function partLoop() {
-    try { applyParting(); } catch (e) { /* decorative only */ }
-    if (partActive) requestAnimationFrame(partLoop);
-  }
-
-  /* ---------- the eye ---------- */
-  const LOOK = { x: 10, y: 3 };    /* how far the iris travels, in icon units */
-  const setLid = v => { lid = v; lidEl.style.transform = "scaleY(" + v + ")"; };
-  const setIris = (x, y) => { irisEl.style.transform = "translate(" + x + "px," + y + "px)"; };
-
-  function ramp(to, ms) {
-    return new Promise(res => {
-      const from = p, t0 = performance.now();
-      (function step(now) {
-        const k = Math.min(1, (now - t0) / ms);
-        p = from + (to - from) * k;
-        eyeEl.style.opacity = String(p);
-        if (k < 1 && running) requestAnimationFrame(step); else res();
-      })(t0);
-    });
-  }
-
+  /* ---------- the eye: sequence ---------- */
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   async function eyeSequence() {
-    if (!eyeEl || !lidEl || !irisEl || document.hidden || !running) return;
-    partActive = true;
-    requestAnimationFrame(partLoop);
-    setLid(0.05); setIris(0, 0);
-    await ramp(1, 900);                          /* fades in shut, the data parts around it */
+    if (!ctx || !ALMOND || document.hidden || !running) return;
+    lidT = 0.05; lid = 0.05; tx = ty = 0; ix = iy = 0;
+    pT = 1;                                          /* fades in shut, carved into the stream */
+    await sleep(1100);
     const beats = [
-      () => setLid(1),                       400,
-      () => setIris(-LOOK.x, 0),             900,
-      () => setIris(-LOOK.x, -LOOK.y),       450,
-      () => setIris(LOOK.x, -LOOK.y),        900,
-      () => setIris(LOOK.x, LOOK.y),         450,
-      () => setIris(0, 0),                   600,
-      () => setLid(0.05),                    500
+      () => { lidT = 1; },                          400,
+      () => { tx = -LOOK.x; ty = 0; },              900,
+      () => { tx = -LOOK.x; ty = -LOOK.y; },        450,
+      () => { tx = LOOK.x; ty = -LOOK.y; },         900,
+      () => { tx = LOOK.x; ty = LOOK.y; },          450,
+      () => { tx = 0; ty = 0; },                    600,
+      () => { lidT = 0.05; },                       550
     ];
     for (let i = 0; i < beats.length && running; i += 2) { beats[i](); await sleep(beats[i + 1]); }
-    await ramp(0, 1000);                         /* dissolves, the data closes back over */
-    applyParting();                              /* p is 0: clears every parted row */
-    partActive = false;
-    setIris(0, 0);
+    pT = 0;                                          /* dissolves, the stream closes back over */
+    await sleep(1200);
   }
 
-  let eyeTimer = null;
   function scheduleEye(first) {
-    if (reduced || !eyeEl) return;
+    if (reduced || !ctx || !ALMOND) return;
     const wait = first ? 12000 + Math.random() * 12000 : 25000 + Math.random() * 45000;
     eyeTimer = setTimeout(async () => {
       try { await eyeSequence(); } catch (e) { /* decorative only */ }
@@ -231,19 +238,34 @@ const Flow = (() => {
     }, wait);
   }
 
+  /* ---------- start / stop ---------- */
+  let ro = null;
+
   function start() {
     if (running) return;
     running = true;
     panel.classList.add("on");
-    emit();
-    scheduleEye(true);
+    if (ctx) {
+      panel.classList.add("canvas");
+      resize();
+      if (window.ResizeObserver && !ro) { ro = new ResizeObserver(resize); ro.observe(panel); }
+      else if (!ro) { window.addEventListener("resize", resize); ro = true; }
+      const need = Math.ceil((H || 400) / rh) + 3;
+      for (let i = 0; i < need; i++) pushLine();
+      last = 0; phase = 0;
+      rafId = requestAnimationFrame(frame);
+      scheduleEye(true);
+    } else {
+      /* no canvas: plain text scroll, no eye */
+      for (let i = 0; i < 20; i++) pushLine();
+      timer = setInterval(pushLine, TICK_MS);
+    }
   }
 
   function stop() {
     running = false;
-    clearTimeout(timer); clearTimeout(eyeTimer);
-    partActive = false; p = 0;
-    if (eyeEl) eyeEl.style.opacity = "0";
+    cancelAnimationFrame(rafId); clearInterval(timer); clearTimeout(eyeTimer);
+    p = pT = 0; lid = lidT = 0.05;
     panel.classList.remove("on");
   }
 
