@@ -48,6 +48,19 @@ const Flow = (() => {
   ];
   const FENCE = "=".repeat(WIDTH);
 
+  /* HIDDEN COMMAND. Every so often three hex lines are slipped into the NOISE
+     (never between the "=" fences, the cipher block is untouched). Each line is
+     8 bytes: a sequence byte (01, 02, 03) then 7 ASCII characters, so together
+     they read as one 21-character command. Reader's trick: hex pairs that fall
+     in 41-7A are letters. Change the text in HIDDEN_CMD to change the command
+     (it must match the command handled in js/triangulate.js). */
+  const HIDDEN_CMD = "DefinitelyOfficeWork2";
+  const FRAG_LINES = [0, 1, 2].map(i => {
+    const part = HIDDEN_CMD.slice(i * 7, i * 7 + 7);
+    return ("0" + (i + 1)) + Array.from(part).map(ch => ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")).join("");
+  });
+  let runsSinceFrag = 99;           /* runs of noise since the last time it appeared */
+
   /* ---------- noise ---------- */
   const HEX = "0123456789ABCDEF", ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ", DIG = "0123456789";
   const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -73,7 +86,15 @@ const Flow = (() => {
   function nextLine() {
     if (!queue.length) {
       const run = 24 + Math.floor(Math.random() * 40);
-      for (let i = 0; i < run; i++) queue.push({ t: noiseLine() });
+      const noise = [];
+      for (let i = 0; i < run; i++) noise.push({ t: noiseLine() });
+      runsSinceFrag++;
+      if (runsSinceFrag >= 3 && Math.random() < 0.4) {
+        const at = 4 + Math.floor(Math.random() * (run - 8));
+        noise.splice(at, 0, ...FRAG_LINES.map(t => ({ t })));
+        runsSinceFrag = 0;
+      }
+      noise.forEach(n => queue.push(n));
       queue.push({ t: FENCE, c: true });
       CIPHER_LINES.forEach(l => queue.push({ t: l, c: true }));
       queue.push({ t: FENCE, c: true });
