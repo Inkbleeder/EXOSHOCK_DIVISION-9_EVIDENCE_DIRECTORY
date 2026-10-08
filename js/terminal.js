@@ -412,6 +412,11 @@ const Term = (() => {
     histIdx = history.length;
     liveEntry = "";
 
+    /* hidden minigame (js/triangulate.js): it sees every line first. It opens
+       on its secret command and, while its window is open, owns its own
+       commands (bearing, lock, transmit ...). Anything else falls through. */
+    if (typeof Triangulate !== "undefined" && Triangulate.handleInput(raw)) return;
+
     const tokens = raw.split(/\s+/);
 
     const name = resolveCmd(tokens[0]);
