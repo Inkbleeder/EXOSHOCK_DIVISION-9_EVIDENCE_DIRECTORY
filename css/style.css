@@ -1137,3 +1137,333 @@ html, body, * {
     -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 30px, #000 calc(100% - 30px), transparent 100%);
             mask-image:linear-gradient(to bottom, transparent 0, #000 30px, #000 calc(100% - 30px), transparent 100%);
 }
+
+
+/* ===========================================================
+   BOARDING VECTOR SOLUTION (hidden minigame, js/triangulate.js)
+
+   Everything reads off the site theme (--green etc.). The three
+   node colours are fixed so they always contrast with the green:
+   amber, cyan and pink. Ship = green square, vessel = green circle.
+   =========================================================== */
+
+.tri-root{ height:100%; }
+
+.tri{
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    height:100%;
+    min-height:0;
+    font-size:12px;
+    letter-spacing:1px;
+    text-shadow:none;
+}
+
+.tri-top{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    padding-bottom:5px;
+    border-bottom:1px solid var(--border);
+    font-size:11px;
+    white-space:nowrap;
+}
+.tri-contract{ font-weight:bold; }
+.tri-prio, .tri-clock{ opacity:.7; }
+
+.tri-main{
+    flex:1 1 auto;
+    min-height:0;
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+    align-content:flex-start;
+    overflow:auto;
+}
+
+.tri-left{ flex:1 1 280px; min-width:0; max-width:400px; }
+
+.tri-radar-wrap{
+    position:relative;
+    width:100%;
+    aspect-ratio:1 / 1;
+}
+
+.tri-radar{
+    display:block;
+    width:100%;
+    height:100%;
+    image-rendering:pixelated;
+    border:1px solid var(--border);
+    background:#010603;
+    cursor:crosshair;
+    touch-action:manipulation;
+    box-shadow:0 0 14px rgba(var(--green-rgb),.18), inset 0 0 24px rgba(var(--green-rgb),.08);
+}
+
+.tri-readout{
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    margin-top:4px;
+    font-size:10px;
+    opacity:.65;
+    white-space:nowrap;
+}
+
+/* toast over the lower part of the radar (contract assigned / results) */
+.tri-toast{
+    display:none;
+    position:absolute;
+    left:0; right:0; bottom:0;
+    padding:10px 12px;
+    background:rgba(1,6,3,.9);
+    border:1px solid var(--border);
+    border-bottom:none;
+    text-align:center;
+    cursor:pointer;
+}
+.tri-toast.on{ display:block; animation:help-fade-in .15s ease; }
+.t-head{ font-weight:bold; letter-spacing:2px; }
+.t-big{ font-size:18px; font-weight:bold; letter-spacing:4px; margin:4px 0; }
+.t-line{ font-size:11px; opacity:.9; line-height:1.5; }
+.t-sub{ font-size:10px; opacity:.6; margin-top:3px; }
+.t-stats{
+    display:flex; justify-content:center; gap:16px;
+    margin-top:6px; padding-top:5px;
+    border-top:1px solid var(--border);
+    font-size:11px; font-weight:bold;
+}
+.tri .dim{ opacity:.6; font-weight:normal; }
+
+/* side column */
+.tri-side{
+    flex:0 0 250px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    min-width:0;
+}
+
+.tri-nodes{ display:flex; flex-direction:column; gap:4px; }
+
+.tri-node{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:5px 8px;
+    font-family:inherit;
+    font-size:11px;
+    letter-spacing:1px;
+    text-align:left;
+    color:var(--nc, var(--green));
+    background:transparent;
+    border:1px solid var(--nc, var(--green));
+    cursor:pointer;
+    opacity:.55;
+}
+.tri-node i{
+    flex:0 0 10px;
+    height:9px;
+    background:var(--nc, var(--green));
+    clip-path:polygon(50% 0, 100% 100%, 0 100%);
+}
+.tri-node b{ flex:0 0 auto; }
+.tri-node span{ margin-left:auto; font-size:10px; opacity:.85; white-space:nowrap; }
+.tri-node.sel{
+    opacity:1;
+    background:rgba(255,255,255,.07);
+    box-shadow:0 0 10px var(--nc);
+}
+.tri-node:disabled{ cursor:default; }
+
+.tri-dialbox{ display:flex; align-items:center; gap:10px; }
+
+.tri-dial{
+    position:relative;
+    flex:0 0 92px;
+    width:92px;
+    height:92px;
+    border-radius:50%;
+    border:2px solid var(--green);
+    background:
+        radial-gradient(circle, #02100a 0 52%, transparent 53%),
+        repeating-conic-gradient(from 0deg, var(--green) 0 1.5deg, transparent 1.5deg 15deg);
+    box-shadow:0 0 12px rgba(var(--green-rgb),.25);
+    cursor:grab;
+    touch-action:none;
+    user-select:none;
+}
+.tri-dial:active{ cursor:grabbing; }
+.tri-dial-ptr{
+    position:absolute;
+    left:calc(50% - 1.5px);
+    top:6px;
+    width:3px;
+    height:calc(50% - 6px);
+    background:var(--yellow);
+    box-shadow:0 0 6px var(--yellow);
+    transform-origin:50% 100%;
+    pointer-events:none;
+}
+.tri-dial span{
+    position:absolute;
+    font-size:9px;
+    font-weight:bold;
+    opacity:.8;
+    pointer-events:none;
+}
+.tri-dial .dn{ left:calc(50% - 3px); top:-14px; }
+.tri-dial .ds{ left:calc(50% - 3px); bottom:-14px; }
+.tri-dial .de{ right:-12px; top:calc(50% - 6px); }
+.tri-dial .dw{ left:-13px; top:calc(50% - 6px); }
+
+.tri-dial-ctrl{ flex:1; min-width:0; }
+.tri-brg{
+    font-size:20px;
+    font-weight:bold;
+    letter-spacing:2px;
+    margin-bottom:5px;
+}
+.tri-steps{ display:flex; gap:3px; }
+.tri-steps button{
+    flex:1;
+    padding:3px 0;
+    font-family:inherit;
+    font-size:12px;
+    font-weight:bold;
+    color:var(--green);
+    background:transparent;
+    border:1px solid var(--border);
+    cursor:pointer;
+}
+.tri-steps button:hover:not(:disabled){ background:var(--green); color:var(--bg); }
+
+.tri-scope{
+    display:block;
+    width:100%;
+    height:52px;
+    border:1px solid var(--border);
+    image-rendering:pixelated;
+    background:#010603;
+}
+
+.tri-sig{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:10px;
+}
+.tri-bar{
+    flex:1;
+    height:8px;
+    border:1px solid var(--border);
+    background:rgba(var(--green-rgb),.06);
+}
+.tri-bar i{ display:block; height:100%; width:0; background:var(--green); }
+
+.tri-btns{ display:flex; flex-wrap:wrap; gap:6px; }
+
+.tri-b{
+    font-family:inherit;
+    font-size:12px;
+    font-weight:bold;
+    letter-spacing:2px;
+    color:var(--green);
+    background:transparent;
+    border:1px solid var(--green);
+    padding:7px 12px;
+    cursor:pointer;
+    text-shadow:none;
+}
+.tri-b:hover:not(:disabled){ background:var(--green); color:var(--bg); }
+.tri-b.alt{ border-color:var(--border); opacity:.8; }
+.tri-b.go{ box-shadow:0 0 10px rgba(var(--green-rgb),.35); }
+.tri-b:disabled, .tri-steps button:disabled{ opacity:.3; cursor:default; }
+.tri-btns .tri-b{ flex:1 1 auto; padding:6px 8px; font-size:11px; }
+
+.tri-comm{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:6px 8px;
+    border:1px solid var(--border);
+    background:rgba(var(--green-rgb),.04);
+    font-size:11px;
+    min-height:30px;
+}
+.tri-comm-tag{
+    flex-shrink:0;
+    padding:0 6px;
+    border:1px solid var(--border);
+    font-weight:bold;
+    opacity:.7;
+    font-size:10px;
+}
+.tri-comm b{ opacity:.7; }
+.tri-comm.intercept{ color:var(--yellow); border-color:rgba(255,224,102,.5); }
+
+.tri-hud{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:space-between;
+    gap:6px 14px;
+    font-size:11px;
+    border-top:1px solid var(--border);
+    padding-top:6px;
+}
+.tri-hud b{ font-weight:bold; }
+.tri-fuel{ display:inline-flex; gap:1px; vertical-align:middle; margin:0 4px; }
+.tri-fuel i{ width:4px; height:10px; background:rgba(var(--green-rgb),.15); }
+.tri-fuel i.on{ background:var(--green); }
+.tri-fuel i.on.low{ background:var(--red); }
+
+/* full-window screens: start, manual, ledger, game over */
+.tri-screen{
+    display:none;
+    position:absolute;
+    inset:0;
+    z-index:20;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    padding:14px;
+    text-align:center;
+    background:rgba(1,6,3,.97);
+    overflow:auto;
+}
+.tri-screen.on{ display:flex; animation:help-fade-in .18s ease; }
+
+.scr-head{ font-size:11px; letter-spacing:3px; opacity:.7; }
+.scr-title{ font-size:24px; font-weight:bold; letter-spacing:5px; text-shadow:0 0 10px var(--green); }
+.scr-title.bad{ color:var(--red); text-shadow:0 0 10px var(--red); font-size:20px; }
+.scr-sub{ font-size:10px; letter-spacing:2px; opacity:.6; }
+.scr-list{ width:min(420px,100%); margin:6px 0; border:1px solid var(--border); }
+.scr-list div{ display:flex; justify-content:space-between; gap:12px; padding:5px 10px; font-size:11px; }
+.scr-list div + div{ border-top:1px solid rgba(var(--green-rgb),.12); }
+.scr-list span{ opacity:.6; }
+.scr-btns{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:4px; }
+.scr-foot{ font-size:10px; opacity:.55; max-width:420px; line-height:1.5; }
+.scr-new{
+    padding:5px 14px;
+    border:1px solid var(--yellow);
+    color:var(--yellow);
+    font-weight:bold;
+    letter-spacing:3px;
+    font-size:12px;
+}
+.scr-body{ width:min(560px,100%); text-align:left; font-size:11px; line-height:1.55; }
+.scr-body p{ margin:0 0 8px; opacity:.9; }
+.scr-body .legend, .scr-body .keys{ opacity:.7; font-size:10px; }
+.scr-body .lg{ font-size:13px; }
+.scr-body .sq{ color:var(--green); }
+.scr-body .ci{ color:var(--green); }
+
+@media (max-width:700px){
+    .tri-left{ max-width:none; }
+    .tri-side{ flex:1 1 100%; }
+    .scr-title{ font-size:19px; letter-spacing:3px; }
+}
