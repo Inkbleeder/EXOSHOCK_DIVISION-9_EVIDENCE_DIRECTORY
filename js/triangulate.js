@@ -15,22 +15,29 @@
    - Pick a node (NODE-01/02/03), turn the dial and LISTEN. The signal meter and
      tone rise as the dial nears the ship's bearing. Lock the bearing at the peak.
    - Each lock draws a wedge (its width is the reading's uncertainty).
-   - Click the radar to place your estimate where the wedges cross. TRANSMIT.
-   - Fuel is the only resource. Clean fix: breach. Near: vessel corrects course
-     (costs more). Miss: vessel recalled, wasted launch. No fuel = shift over.
+   - Click the radar to place your estimate where the wedges cross. A pinned
+     estimate reads back a signal strength: the ship sits at the signal peak, and
+     the reading gets less noisy the closer you are. Unpin and try elsewhere.
+   - The cone (wedge) is wide in early contracts and narrows every contract until
+     it is a bare line: late contracts need a near-perfect bearing.
+   - Fuel: clean fix = breach; near = vessel corrects course (costs more); miss =
+     vessel recalled. Credits are earned per breach. Every 5th contract a supply
+     depot offers fuel for credits. No fuel = shift over.
 
    CONTROLS (mouse, keyboard and typed - the terminal stays usable)
      dial: drag the knob, or buttons, or ArrowLeft / ArrowRight (Shift = x5)
-     Space = lock   1 / 2 / 3 = pick node   (only while the input line is empty)
-     typed: bearing <0-359>, node <1-3>, lock, reset, mark <x> <y>, transmit,
-            start, manual, ledger, skip, quit
+     Space = lock   1 / 2 / 3 = pick node   Delete = unpin   (only while the input line is empty)
+     right-click the radar = unpin
+     typed: bearing <0-359>, node <1-3>, lock, reset, mark <x> <y>, unpin, transmit,
+            resupply, decline, start, manual, ledger, skip, quit
 
    SOUNDS
    Everything has a built-in synthesised stand-in, so the game works with no
    files. To use real recordings, drop WAVs named exactly as in SOUNDS_FOR_CREATOR
-   into  audio/tri/  (e.g. audio/tri/radar_ping.wav). Any file found is used in
-   place of its stand-in; a missing file silently falls back. Voice lines are
-   WAV-only; their text always appears on screen. */
+   into the site's normal  audio/  folder with the prefix bvs_  (e.g.
+   audio/bvs_radar_ping.wav). Any file found is used in place of its stand-in; a
+   missing file silently falls back. Hiding-ship chatter is voice only: no text is
+   ever shown for it. */
 
 const Triangulate = (() => {
 
@@ -42,16 +49,19 @@ const Triangulate = (() => {
   const NODE_COLOURS = ["#ffb347", "#55cfff", "#ff9de2"];
   const START_FUEL = 100;
   const FUEL_COST = { clean: 10, near: 20, miss: 35 };
-  const RESUPPLY = 10;                        /* refunded when a breach succeeds */
-  const TOL_CLEAN = 3.5;                      /* km */
-  const TOL_NEAR = 8;
-  const DOCK = { x: 9, y: 91 };
+  const RESUPPLY = 10;                        /* fuel refunded when a breach succeeds */
+  const FINAL_CONTRACT = 14;                  /* from here on the cone is a bare line */
+  const CONE_START = 24;                      /* wedge half-angle (deg) on contract 1 */
+  const TOL_START = 7.0, TOL_END = 1.2;       /* clean-fix radius (km), first -> last */
+  const CREDIT_CLEAN = 140, CREDIT_STREAK = 15, CREDIT_NEAR = 60;
+  const DEPOT_EVERY = 5, DEPOT_COST = 300, DEPOT_FUEL = 50;
   const VESSEL_SPEED = 34;                    /* km per second */
   const BRIEF_S = 1.7;
   const RESULT_S = 4.2;
   const SWEEP_DEG_S = 48;
   const BEST_KEY = "d9-bvs-best";
-  const AUDIO_DIR = "audio/tri/";
+  const AUDIO_DIR = "audio/";                 /* the site's normal audio folder */
+  const AUDIO_PREFIX = "bvs_";                /* keeps game files apart from the site's own */
 
   /* ================= small maths ================= */
 
@@ -68,20 +78,22 @@ const Triangulate = (() => {
   const pad = (n, w) => String(Math.max(0, Math.floor(n))).padStart(w, "0");
   const fmtT = s => pad(s / 60, 2) + ":" + pad(s % 60, 2);
   const fmtN = n => Math.round(n).toLocaleString("en-US");
+  /* difficulty ramp: 0 on contract 1 -> 1 on the final contract */
+  const ramp = n => clamp((n - 1) / (FINAL_CONTRACT - 1), 0, 1);
+  const coneFor = n => n >= FINAL_CONTRACT ? 0 : CONE_START * Math.pow(1 - ramp(n), 1.4);
+  const tolClean = n => TOL_START + (TOL_END - TOL_START) * ramp(n);
+  const tolNear = n => tolClean(n) * 2.2;
+  /* the boarding vessel launches from a random point on the sector's edge */
+  function edgeDock() {
+    const side = Math.floor(Math.random() * 4), k = rnd(8, 92), e = 4;
+    return side === 0 ? { x: k, y: e } : side === 1 ? { x: 100 - e, y: k } : side === 2 ? { x: k, y: 100 - e } : { x: e, y: k };
+  }
 
-  /* the analyst-facing words */
-  const VOICES = {
-    pilot: ["Engines cold. Keep her drifting.", "Hold your course. Don't touch the thrusters.",
-            "Running dark. Nobody breathe loud.", "If they come about, we burn for the rocks.",
-            "Steady... steady. They're not looking this way.", "Fuel's thin. We can't run, so we hide."],
-    comms: ["Receive only. Nobody transmits.", "Carrier's quiet. Keep it that way.",
-            "I'm hearing sweeps. Close ones.", "Antenna's folded. We're a rock out here.",
-            "Don't acknowledge. Whatever they send, don't acknowledge.", "Someone's listening. I can feel it."],
-    crew: ["Did you hear that?", "How long do we sit here?", "They said the contract would be forgotten.",
-           "Keep the lights low.", "It's too quiet.", "Tell me they didn't find us."],
-    reaction: ["Contact. Small craft, closing.", "They found us. They found us.", "Brace for docking!",
-               "Cut the lights! Cut\u2014", "Hull contact. They're here.", "Lock the hatch."]
-  };
+  /* Hiding-ship chatter is audio only (files bvs_<group>_NN.wav); nothing is printed.
+     The count per group is all the code needs. */
+  const VOICE_GROUPS = { pilot: 6, comms: 6, crew: 6, reaction: 6 };
+  const VOICE_FILES = [];
+  Object.keys(VOICE_GROUPS).forEach(g => { for (let i = 1; i <= VOICE_GROUPS[g]; i++) VOICE_FILES.push(g + "_" + pad(i, 2)); });
   const DISPATCH = {
     dispatch_fix_received:      "Fix received. Preparing boarding vessel.",
     dispatch_vessel_away:       "Boarding vessel away.",
@@ -125,7 +137,7 @@ const Triangulate = (() => {
         a.preload = "auto";
         a.addEventListener("canplaythrough", () => { f.ok = true; }, { once: true });
         a.addEventListener("error", () => { f.ok = false; }, { once: true });
-        a.src = AUDIO_DIR + name + ".wav";
+        a.src = AUDIO_DIR + AUDIO_PREFIX + name + ".wav";
         f.el = a;
       } catch (e) { f.ok = false; }
       return f;
@@ -177,7 +189,11 @@ const Triangulate = (() => {
       dial_tick:        () => burst(0.02, { f: 2600, vol: 0.12 }),
       radar_ping:       () => { tone(1250, 0.5, { to: 880, vol: 0.12 }); tone(1250, 0.5, { to: 880, vol: 0.05, delay: 0.18 }); },
       lock_engage:      () => { tone(120, 0.14, { type: "square", vol: 0.28 }); tone(880, 0.1, { delay: 0.06, vol: 0.18 }); },
-      marker_place:     () => tone(1400, 0.05, { type: "square", vol: 0.12 }),
+      marker_place:     o => tone(900 + 1200 * ((o && o.v) || 0), 0.06, { type: "square", vol: 0.12 }),
+      credits_earned:   () => { tone(1320, 0.07, { type: "square", vol: 0.1 }); tone(1760, 0.12, { type: "square", vol: 0.1, delay: 0.08 }); },
+      depot_open:       () => { tone(300, 0.1, { type: "triangle", vol: 0.14 }); tone(450, 0.14, { type: "triangle", vol: 0.14, delay: 0.1 }); },
+      resupply_confirm: () => { burst(0.5, { f: 300, fTo: 1400, filter: "lowpass", vol: 0.2 }); tone(220, 0.4, { to: 440, type: "sawtooth", vol: 0.1 }); tone(880, 0.12, { type: "square", vol: 0.1, delay: 0.45 }); },
+      chatter:          () => { for (let i = 0; i < 5; i++) { const d = i * 0.09; burst(0.07, { f: rnd(500, 1400), vol: 0.07, delay: d }); tone(rnd(160, 260), 0.07, { type: "sawtooth", vol: 0.04, delay: d }); } },
       bearing_clear:    () => tone(700, 0.2, { to: 240, type: "triangle", vol: 0.18 }),
       node_online:      () => tone(660, 0.09, { type: "square", vol: 0.1 }),
       contract_assigned:() => { tone(520, 0.08, { type: "square", vol: 0.12 }); tone(780, 0.1, { type: "square", vol: 0.12, delay: 0.11 }); },
@@ -261,7 +277,7 @@ const Triangulate = (() => {
           return;
         } catch (e) { /* fall through to the stand-in */ }
       }
-      if (SYN[name]) SYN[name]();
+      if (SYN[name]) SYN[name](opts);
     }
 
     function loopStart(name) {
@@ -293,10 +309,12 @@ const Triangulate = (() => {
       if (h) { try { h.stop(); } catch (e) {} delete loops[name]; }
     }
     function stopAll() { Object.keys(loops).forEach(loopStop); }
-    function voice(name) {
+    function voice(name, standIn) {
       if (muted()) return;
+      resume();
       const f = probe(name);
-      if (f.ok && f.el) { try { const a = f.el.cloneNode(); a.volume = 0.9; a.play().catch(() => {}); } catch (e) {} }
+      if (f.ok && f.el) { try { const a = f.el.cloneNode(); a.volume = 0.9; a.play().catch(() => {}); return; } catch (e) {} }
+      if (standIn && SYN[standIn]) SYN[standIn]();
     }
     function preload(list) { list.forEach(probe); }
 
@@ -331,16 +349,18 @@ const Triangulate = (() => {
   }
 
   function newShift() {
-    return { fuel: START_FUEL, value: 0, breaches: 0, clean: 0, recalls: 0, contracts: 0, streak: 0, newBest: false };
+    return { fuel: START_FUEL, credits: 0, earned: 0, value: 0, breaches: 0, clean: 0, recalls: 0, contracts: 0, streak: 0, newBest: false };
   }
 
   /* ================= contracts ================= */
 
   function makeContract(n) {
     let best = null;
+    const cone = coneFor(n);
+    const dock = edgeDock();
     for (let tries = 0; tries < 300 && !best; tries++) {
       const T = { x: rnd(24, 76), y: rnd(24, 76) };
-      if (dist(T, DOCK) < 28) continue;
+      if (dist(T, dock) < 28) continue;
       const a0 = rnd(0, 360), a1 = a0 + rnd(62, 150), a2 = a1 + rnd(62, 150);
       if (360 - (a2 - a0) < 58) continue;
       const nodes = [];
@@ -350,13 +370,13 @@ const Triangulate = (() => {
         const p = pointAt(T, a, r);
         if (p.x < 6 || p.x > 94 || p.y < 6 || p.y > 94) ok = false;
         const d = dist(p, T);
-        const biasDeg = 1.1 + Math.min(n, 12) * 0.32;
+        const biasDeg = cone * 0.3;                       /* reading error shrinks with the cone */
         nodes.push({
           i, x: p.x, y: p.y, colour: NODE_COLOURS[i],
           trueB: bearingTo(p, T),
           bias: gauss() * biasDeg * 0.7,
           biasDeg,
-          jit: clamp(0.05 + (n - 1) * 0.014 + d / 420, 0.05, 0.26),
+          jit: clamp(0.03 + (n - 1) * 0.006 + d / 600, 0.03, 0.12),
           decoyB: norm360(bearingTo(p, T) + (Math.random() < 0.5 ? -1 : 1) * rnd(70, 140)),
           decoy: n >= 4,
           phase: rnd(0, 6.28),
@@ -370,28 +390,41 @@ const Triangulate = (() => {
     if (!best) {             /* fallback: a fixed, valid layout */
       const T = { x: 55, y: 45 };
       best = { T, nodes: [0, 130, 250].map((a, i) => { const p = pointAt(T, a, 34); return {
-        i, x: p.x, y: p.y, colour: NODE_COLOURS[i], trueB: bearingTo(p, T), bias: 0, biasDeg: 1.5, jit: 0.08,
+        i, x: p.x, y: p.y, colour: NODE_COLOURS[i], trueB: bearingTo(p, T), bias: 0, biasDeg: cone * 0.3, jit: 0.05,
         decoyB: 0, decoy: false, phase: 0, dial: 0, locked: null, wedge: 0, noise: 0, sm: 0.15, raw: 0.15 }; }) };
     }
     return {
       n, id: "D9-C-" + pad(400 + n * 3 + Math.floor(rnd(0, 3)), 4),
       priority: n <= 3 ? "ROUTINE" : n <= 7 ? "PRIORITY" : "CRITICAL",
-      target: best.T, nodes: best.nodes, marker: null, found: false,
+      target: best.T, nodes: best.nodes, dock, marker: null, found: false,
       elapsed: 0, said: {}, lastInterceptAt: -99
     };
   }
 
-  /* the signal: broad lobe so the dial can be swept by ear, a sharp peak at the ship */
-  function lobe(errDeg) {
+  /* the signal at a dial angle: a broad lobe so the dial can be swept by ear, plus a
+     sharp peak at the ship that gets narrower every contract */
+  function lobe(errDeg, n) {
+    const t = ramp(n || 1);
     const c = (1 + Math.cos(rad(errDeg))) / 2;
-    return 0.12 + 0.88 * c * c * c;
+    const broad = c * c * c;
+    const w = 12 - 10 * t;                              /* degrees */
+    const sharp = Math.exp(-Math.pow(errDeg / w, 2));
+    return 0.12 + 0.88 * (0.55 * broad + 0.45 * sharp);
   }
 
   function nodeSignal(nd, dial, t, n) {
-    let s = lobe(angDiff(dial, nd.trueB + nd.bias));
-    if (nd.decoy) s = Math.max(s, 0.62 * lobe(angDiff(dial, nd.decoyB)));
-    if (n >= 6) s *= 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * 1.1 + nd.phase));
+    let s = lobe(angDiff(dial, nd.trueB + nd.bias), n);
+    if (nd.decoy) s = Math.max(s, 0.62 * lobe(angDiff(dial, nd.decoyB), n));
+    if (n >= 6) s *= 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(t * 1.1 + nd.phase));
     return clamp(s, 0, 1);
+  }
+
+  /* what a pinned estimate reads back: strongest AT the ship, and the reading gets
+     less noisy the closer it is */
+  function markerSignal(c, m) {
+    const d = dist(m, c.target);
+    const scale = 16 - 8 * ramp(c.n);
+    return clamp(Math.exp(-d / scale) + gauss() * 0.06 * Math.min(1, d / 20), 0, 1);
   }
 
   /* ================= DOM ================= */
@@ -409,7 +442,7 @@ const Triangulate = (() => {
           <canvas class="tri-radar" data-r="radar" width="${RES}" height="${RES}"></canvas>
           <div class="tri-toast" data-r="toast"></div>
         </div>
-        <div class="tri-readout"><span data-r="cursor">CURSOR --- / ---</span><span data-r="marker">MARKER --- / ---</span></div>
+        <div class="tri-readout"><span data-r="cursor">CURSOR --- / ---</span><span data-r="marker">PIN --- / ---</span></div>
       </div>
       <div class="tri-side">
         <div class="tri-nodes" data-r="nodes">
@@ -429,6 +462,7 @@ const Triangulate = (() => {
         <div class="tri-btns">
           <button class="tri-b" data-a="lock">LOCK BEARING</button>
           <button class="tri-b alt" data-a="reset">RESET</button>
+          <button class="tri-b alt" data-a="unpin">UNPIN</button>
           <button class="tri-b go" data-a="transmit">TRANSMIT FIX</button>
         </div>
       </div>
@@ -436,6 +470,7 @@ const Triangulate = (() => {
     <div class="tri-comm" data-r="comm"><span class="tri-comm-tag">COMMS</span><span data-r="commtext">NO TRAFFIC.</span></div>
     <div class="tri-hud">
       <span class="hud-fuel">FUEL <span class="tri-fuel" data-r="fuel"></span> <b data-r="fuelnum">100</b></span>
+      <span>CREDITS <b data-r="credits">0</b></span>
       <span>VALUE <b data-r="value">0</b></span>
       <span>BEST SHIFT <b data-r="best">0</b></span>
       <span>BREACHES <b data-r="breaches">0</b></span>
@@ -486,7 +521,8 @@ const Triangulate = (() => {
     Sfx.preload(["ambience_space_loop", "radar_ping", "dial_tick", "signal_tone_loop", "static_loop",
                  "lock_engage", "marker_place", "transmit_send", "vessel_launch", "vessel_travel_loop",
                  "vessel_dock", "breach_success", "vessel_recall", "shift_start", "contract_assigned",
-                 "shift_over", "node_online", "new_best_shift", "fuel_warning_loop", "ui_click", "bearing_clear"]);
+                 "shift_over", "node_online", "new_best_shift", "fuel_warning_loop", "ui_click", "bearing_clear",
+                 "credits_earned", "depot_open", "resupply_confirm"].concat(VOICE_FILES, Object.keys(DISPATCH), Object.keys(SYS)));
     Sfx.loopStart("ambience_space_loop");
     Sfx.loopSet("ambience_space_loop", 1);
     showMenu();
@@ -556,12 +592,12 @@ const Triangulate = (() => {
       <div class="scr-head">OPERATOR MANUAL</div>
       <div class="scr-body">
         <p><b>OBJECTIVE.</b> A contract is waiting on a ship that is hiding. Find it. Three listening nodes can each be turned toward the signal. Where their bearings cross, the ship is.</p>
-        <p><b>1. LISTEN.</b> Pick a node. Turn its dial. The meter and tone rise as you near the ship. Lock the bearing at the peak. Weak locks draw wide wedges.</p>
-        <p><b>2. CROSS.</b> Lock at least two nodes (three is better). Click the radar where the wedges meet to place your estimate.</p>
-        <p><b>3. TRANSMIT.</b> The boarding vessel flies to your coordinates. If the ship is there, it docks and breaches. Near misses cost extra fuel. A miss is recalled.</p>
-        <p><b>FUEL</b> is the only resource. Clean fix: no net cost. Near: 10. Miss: 35. At zero the shift ends.</p>
+        <p><b>1. LISTEN.</b> Pick a node. Turn its dial. The meter and tone rise as you near the ship. Lock the bearing at the peak. Each lock draws a cone: wide on early contracts, narrower every contract, and a bare line at the end. Late contracts need a near-perfect bearing.</p>
+        <p><b>2. CROSS.</b> Lock at least two nodes (three is better). Click the radar where the cones meet to pin your estimate. The pin reads back a signal strength: the ship is at the peak, and the reading is steadier the closer you are. Right-click, UNPIN or Delete to lift it and try again.</p>
+        <p><b>3. TRANSMIT.</b> The boarding vessel launches from a different point on the sector edge each contract and flies to your pin. If the ship is there, it docks and breaches. Near misses cost extra fuel. A miss is recalled.</p>
+        <p><b>FUEL</b> is the main limit. Clean fix: no net cost. Near: 10. Miss: 35. At zero the shift ends. <b>CREDITS</b> are earned per breach. Every 5th contract the supply depot sells fuel (${DEPOT_FUEL} units for ${DEPOT_COST} credits).</p>
         <p class="legend"><span class="lg tri-sym" style="color:#ffb347">&#9650;</span> NODE &nbsp; <span class="lg sq">&#9632;</span> SHIP (once found) &nbsp; <span class="lg ci">&#9679;</span> BOARDING VESSEL &nbsp; <span class="lg" style="color:#fff">+</span> YOUR ESTIMATE</p>
-        <p class="keys"><b>KEYS</b> ArrowLeft / ArrowRight turn the dial (Shift = x5) &middot; Space locks &middot; 1 2 3 pick a node &middot; only while the terminal line is empty.<br><b>TYPED</b> bearing 045 &middot; node 2 &middot; lock &middot; reset &middot; mark 42 63 &middot; transmit &middot; skip &middot; quit</p>
+        <p class="keys"><b>KEYS</b> ArrowLeft / ArrowRight turn the dial (Shift = x5) &middot; Space locks &middot; 1 2 3 pick a node &middot; Delete unpins &middot; only while the terminal line is empty.<br><b>TYPED</b> bearing 045 &middot; node 2 &middot; lock &middot; reset &middot; mark 42 63 &middot; unpin &middot; transmit &middot; resupply &middot; decline &middot; skip &middot; quit</p>
       </div>
       <div class="scr-btns"><button class="tri-b go" data-a="start">BEGIN SHIFT</button><button class="tri-b" data-a="menu">BACK</button></div>`);
   }
@@ -596,6 +632,7 @@ const Triangulate = (() => {
       ${s.newBest ? '<div class="scr-new">&#9733; NEW BEST SHIFT &#9733;</div>' : ""}
       <div class="scr-list">
         <div><span>CONTRACT VALUE</span><b>${fmtN(s.value)}</b></div>
+        <div><span>CREDITS EARNED</span><b>${fmtN(s.earned)}</b></div>
         <div><span>BEST SHIFT</span><b>${fmtN(G.best.value)}</b></div>
         <div><span>BREACHES</span><b>${s.breaches}</b></div>
         <div><span>CLEAN FIXES</span><b>${s.clean}</b></div>
@@ -604,6 +641,48 @@ const Triangulate = (() => {
       </div>
       <div class="scr-foot">Your performance has been noted. (It has not been filed. This session does not exist.)</div>
       <div class="scr-btns"><button class="tri-b go" data-a="start">NEXT SHIFT</button><button class="tri-b alt" data-a="quit">CLOCK OUT</button></div>`, "over");
+  }
+
+  function showDepot() {
+    G.state = "DEPOT";
+    hideToast();
+    Sfx.loopStop("signal_tone_loop"); Sfx.loopStop("static_loop"); Sfx.loopStop("fuel_warning_loop");
+    Sfx.play("depot_open");
+    const s = G.shift, gain = Math.min(DEPOT_FUEL, START_FUEL - Math.max(0, s.fuel));
+    screen(`
+      <div class="scr-head">SUPPLY DEPOT</div>
+      <div class="scr-title">RESUPPLY AVAILABLE</div>
+      <div class="scr-sub">${s.contracts} CONTRACTS ON FILE. FUEL FOR CREDITS.</div>
+      <div class="scr-list">
+        <div><span>FUEL RESERVE</span><b>${Math.max(0, Math.round(s.fuel))} / ${START_FUEL}</b></div>
+        <div><span>CREDITS</span><b>${fmtN(s.credits)}</b></div>
+        <div><span>OFFER</span><b>+${gain} FUEL</b></div>
+        <div><span>COST</span><b>${fmtN(DEPOT_COST)} CREDITS</b></div>
+      </div>
+      <div class="scr-btns">
+        <button class="tri-b go" data-a="resupply">RESUPPLY</button>
+        <button class="tri-b alt" data-a="decline">DECLINE</button>
+      </div>
+      <div class="scr-foot">Type  resupply  or  decline.  The depot opens every ${DEPOT_EVERY}th contract.</div>`);
+    renderHUD();
+  }
+
+  function resupply() {
+    if (!G || G.state !== "DEPOT") return false;
+    const s = G.shift;
+    if (s.credits < DEPOT_COST) return false;
+    s.credits -= DEPOT_COST;
+    s.fuel = Math.min(START_FUEL, Math.max(0, s.fuel) + DEPOT_FUEL);
+    Sfx.play("resupply_confirm");
+    renderHUD();
+    nextContract();
+    return true;
+  }
+
+  function decline() {
+    if (!G || G.state !== "DEPOT") return false;
+    if (G.shift.fuel <= 0) showOver(); else nextContract();
+    return true;
   }
 
   /* ================= flow of a shift ================= */
@@ -673,7 +752,8 @@ const Triangulate = (() => {
     const nd = activeNode();
     const s = nd.sm;
     nd.locked = nd.dial;
-    nd.wedge = clamp(2.2 * nd.biasDeg + 1.5 + (1 - s) * 5, 3, 15);
+    const cone = coneFor(G.contract.n);
+    nd.wedge = cone > 0 ? cone * (1 + (1 - s) * 0.5) : 0;          /* a bare line at the climax */
     Sfx.play("lock_engage");
     say("sys_bearing_locked", SYS.sys_bearing_locked, "SYSTEM");
     updateSide();
@@ -691,8 +771,18 @@ const Triangulate = (() => {
 
   function placeMarker(x, y) {
     if (!G || G.state !== "SEARCH") return false;
-    G.contract.marker = { x: clamp(x, 0, SECTOR), y: clamp(y, 0, SECTOR) };
-    Sfx.play("marker_place");
+    const m = { x: clamp(x, 0, SECTOR), y: clamp(y, 0, SECTOR) };
+    m.sig = markerSignal(G.contract, m);
+    G.contract.marker = m;
+    Sfx.play("marker_place", { v: m.sig });
+    updateSide();
+    return true;
+  }
+
+  function unpin() {
+    if (!G || G.state !== "SEARCH" || !G.contract.marker) return false;
+    G.contract.marker = null;
+    Sfx.play("ui_click");
     updateSide();
     return true;
   }
@@ -712,12 +802,12 @@ const Triangulate = (() => {
     }
     const c = G.contract;
     const err = dist(c.marker, c.target);
-    const outcome = err <= TOL_CLEAN ? "clean" : err <= TOL_NEAR ? "near" : "miss";
+    const outcome = err <= tolClean(c.n) ? "clean" : err <= tolNear(c.n) ? "near" : "miss";
     G.state = "FLIGHT";
     Sfx.loopStop("signal_tone_loop"); Sfx.loopStop("static_loop");
     Sfx.play("transmit_send");
     say("dispatch_fix_received", DISPATCH.dispatch_fix_received, "DISPATCH");
-    G.flight = { outcome, err, phase: "wait", t: 1.1, x: DOCK.x, y: DOCK.y, locks: lockedCount(), said: {} };
+    G.flight = { outcome, err, phase: "wait", t: 1.1, x: c.dock.x, y: c.dock.y, locks: lockedCount(), said: {} };
     updateSide();
     return true;
   }
@@ -761,41 +851,39 @@ const Triangulate = (() => {
     } else if (f.phase === "hold") {
       if (f.t <= 0) { f.phase = "return"; Sfx.play("vessel_recall"); }
     } else if (f.phase === "return") {
-      if (moveVessel(f, DOCK, VESSEL_SPEED * 1.2, dt)) { Sfx.loopStop("vessel_travel_loop"); finishContract(); }
+      if (moveVessel(f, c.dock, VESSEL_SPEED * 1.2, dt)) { Sfx.loopStop("vessel_travel_loop"); finishContract(); }
     }
   }
 
   function foundShip() {
     G.contract.found = true;
-    const text = pickLine("reaction");
-    say(lastLine, text, "INTERCEPT");
+    say(voiceName("reaction"), "", "INTERCEPT");
   }
 
-  let lastLine = "";
-  function pickLine(group) {
-    const arr = VOICES[group];
-    const i = Math.floor(Math.random() * arr.length);
-    lastLine = group + "_" + pad(i + 1, 2);
-    return arr[i];
+  /* picks one recorded line of a group; returns its file name (no text exists for it) */
+  function voiceName(group) {
+    return group + "_" + pad(1 + Math.floor(Math.random() * VOICE_GROUPS[group]), 2);
   }
 
   function finishContract() {
     const s = G.shift, c = G.contract, f = G.flight;
     s.contracts++;
-    let pts = 0, lines, head;
+    let pts = 0, cr = 0, lines, head;
     const mult = 1 + 0.1 * Math.min(s.streak, 5);
 
     if (f.outcome === "clean") {
       const lockB = f.locks >= 3 ? 250 : 0;
-      const acc = Math.round((1 - f.err / TOL_CLEAN) * 250);
+      const acc = Math.round((1 - f.err / tolClean(c.n)) * 250);
       const tb = Math.round(Math.max(0, 500 * (1 - c.elapsed / 90)));
       pts = Math.round((1000 + lockB + acc + tb) * mult);
+      cr = CREDIT_CLEAN + CREDIT_STREAK * Math.min(s.streak, 5);
       s.streak++; s.clean++; s.breaches++;
       s.fuel -= FUEL_COST.clean - RESUPPLY;
       head = `FIX ACCEPTED <span class="dim">&middot; ERROR ${f.err.toFixed(1)} KM</span>`;
       lines = ["BOARDING VESSEL LAUNCHED.", "DOCKED. BREACH SUCCESSFUL.", "CONTRACT IN PROGRESS."];
     } else if (f.outcome === "near") {
       pts = 400 + (f.locks >= 3 ? 100 : 0);
+      cr = CREDIT_NEAR;
       s.streak = 0; s.breaches++;
       s.fuel -= FUEL_COST.near - RESUPPLY;
       head = `WITHIN TOLERANCE <span class="dim">&middot; ERROR ${f.err.toFixed(1)} KM</span>`;
@@ -807,6 +895,8 @@ const Triangulate = (() => {
       lines = ["BOARDING VESSEL RECALLED.", "CONTRACT OPEN."];
     }
     s.value += pts;
+    s.credits += cr; s.earned += cr;
+    if (cr) setTimeout(() => G && Sfx.play("credits_earned"), 700);
     if (s.value > G.best.value) {
       G.best = { value: s.value, breaches: s.breaches, clean: s.clean, rating: ratingFor(s.value) };
       saveBest(G.best);
@@ -818,30 +908,40 @@ const Triangulate = (() => {
     G.timer = RESULT_S;
     const fuelNet = f.outcome === "clean" ? 0 : f.outcome === "near" ? -(FUEL_COST.near - RESUPPLY) : -FUEL_COST.miss;
     toast(`<div class="t-head">${head}</div>${lines.map(l => `<div class="t-line">${l}</div>`).join("")}
-           <div class="t-stats"><span>${pts ? "+" + fmtN(pts) + " VALUE" + (mult > 1 && f.outcome === "clean" ? " (x" + mult.toFixed(1) + ")" : "") : "NO VALUE"}</span><span>FUEL ${fuelNet >= 0 ? "+" : ""}${fuelNet}</span></div>
-           <div class="t-sub">${s.fuel > 0 ? "NEXT CONTRACT SHORTLY. (CLICK OR TYPE skip)" : ""}</div>`);
+           <div class="t-stats"><span>${pts ? "+" + fmtN(pts) + " VALUE" + (mult > 1 && f.outcome === "clean" ? " (x" + mult.toFixed(1) + ")" : "") : "NO VALUE"}</span><span>${cr ? "+" + cr + " CR" : "NO CREDITS"}</span><span>FUEL ${fuelNet >= 0 ? "+" : ""}${fuelNet}</span></div>
+           <div class="t-sub">${depotDue() ? "SUPPLY DEPOT: " + (s.credits >= DEPOT_COST ? "OPEN NEXT." : "CLOSED (INSUFFICIENT CREDITS).") : ""}</div>
+           <div class="t-sub">${s.fuel > 0 || depotDue() ? "NEXT CONTRACT SHORTLY. (CLICK OR TYPE skip)" : ""}</div>`);
     updateSide();
   }
 
+  function depotDue() { return G.shift.contracts > 0 && G.shift.contracts % DEPOT_EVERY === 0; }
+
   function afterResult() {
     hideToast();
-    if (G.shift.fuel <= 0) showOver(); else nextContract();
+    const s = G.shift;
+    if (depotDue() && s.credits >= DEPOT_COST) showDepot();
+    else if (s.fuel <= 0) showOver();
+    else nextContract();
   }
 
   /* ================= voices / comms ================= */
 
   function say(file, text, label) {
     if (!G) return;
-    G.R.commtext.innerHTML = `<b>${label}</b> &rsaquo; ${label === "INTERCEPT" ? "&ldquo;" + text + "&rdquo;" : text}`;
-    G.R.comm.classList.toggle("intercept", label === "INTERCEPT");
+    if (label === "INTERCEPT") {                          /* ship chatter: sound only, no words */
+      G.R.commtext.innerHTML = `<b>INTERCEPT</b> &rsaquo; <span class="dim">VOICE TRAFFIC &middot; AUDIO ONLY</span>`;
+      G.R.comm.classList.add("intercept");
+      Sfx.voice(file, "chatter");
+      return;
+    }
+    G.R.commtext.innerHTML = `<b>${label}</b> &rsaquo; ${text}`;
+    G.R.comm.classList.remove("intercept");
     Sfx.voice(file);
   }
 
   function intercept() {
     const groups = ["pilot", "comms", "crew"];
-    const g = groups[Math.floor(Math.random() * groups.length)];
-    const text = pickLine(g);
-    say(lastLine, text, "INTERCEPT");
+    say(voiceName(groups[Math.floor(Math.random() * groups.length)]), "", "INTERCEPT");
   }
 
   /* ================= HUD / side panel ================= */
@@ -852,6 +952,7 @@ const Triangulate = (() => {
     const segs = 20, on = Math.ceil(clamp(s.fuel, 0, 100) / 5);
     R.fuel.innerHTML = Array.from({ length: segs }, (_, i) => `<i class="${i < on ? "on" : ""}${s.fuel <= 25 && i < on ? " low" : ""}"></i>`).join("");
     R.fuelnum.textContent = Math.max(0, Math.round(s.fuel));
+    R.credits.textContent = fmtN(s.credits);
     R.value.textContent = fmtN(s.value);
     R.best.textContent = fmtN(G.best.value);
     R.breaches.textContent = s.breaches;
@@ -881,7 +982,8 @@ const Triangulate = (() => {
       R.brg.style.color = NODE_COLOURS[G.active];
     }
     const mk = c && c.marker;
-    R.marker.textContent = mk ? "MARKER " + pad(mk.x, 3) + " / " + pad(mk.y, 3) : "MARKER --- / ---";
+    R.marker.textContent = mk ? "PIN " + pad(mk.x, 3) + " / " + pad(mk.y, 3) + " \u00b7 SIG " + pad(mk.sig * 100, 2) + "%" : "PIN --- / ---";
+    R.root.querySelector('[data-a="unpin"]').disabled = !(live && mk);
     R.root.querySelector('[data-a="transmit"]').disabled = !canTransmit();
     R.root.querySelector('[data-a="lock"]').disabled = !live;
     R.root.querySelector('[data-a="reset"]').disabled = !live;
@@ -952,12 +1054,14 @@ const Triangulate = (() => {
       ctx.stroke();
     }
 
-    /* dock */
-    const d = WORLD(DOCK);
-    ctx.strokeStyle = withAlpha(ink, 0.7);
-    ctx.strokeRect(Math.round(d.x) - 4.5, Math.round(d.y) - 4.5, 9, 9);
-    ctx.fillStyle = withAlpha(ink, 0.7);
-    ctx.fillText("D9", Math.round(d.x) + 7, Math.round(d.y) - 4);
+    /* dock (random point on the sector edge, new every contract) */
+    if (c) {
+      const d = WORLD(c.dock);
+      ctx.strokeStyle = withAlpha(ink, 0.7);
+      ctx.strokeRect(Math.round(d.x) - 4.5, Math.round(d.y) - 4.5, 9, 9);
+      ctx.fillStyle = withAlpha(ink, 0.7);
+      ctx.fillText("D9", clamp(Math.round(d.x) + 7, 2, RES - 18), clamp(Math.round(d.y) - 4, 2, RES - 10));
+    }
 
     if (c) {
       /* wedges (locked) */
@@ -986,7 +1090,7 @@ const Triangulate = (() => {
       if (G.flight && G.flight.phase !== "wait") {
         ctx.setLineDash([2, 4]);
         ctx.strokeStyle = withAlpha(ink, 0.45);
-        const v = WORLD(G.flight), dd = WORLD(DOCK);
+        const v = WORLD(G.flight), dd = WORLD(c.dock);
         ctx.beginPath(); ctx.moveTo(dd.x, dd.y); ctx.lineTo(v.x, v.y); ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -1128,6 +1232,9 @@ const Triangulate = (() => {
     else if (a === "quit") closeGame();
     else if (a === "lock") lock();
     else if (a === "reset") resetLocks();
+    else if (a === "unpin") unpin();
+    else if (a === "resupply") resupply();
+    else if (a === "decline") decline();
     else if (a === "transmit") transmit();
     else if (a === "skip") skip();
     else if (a.startsWith("node")) selectNode(parseInt(a.slice(4), 10));
@@ -1151,7 +1258,9 @@ const Triangulate = (() => {
     });
 
     /* place the estimate */
+    R.radar.addEventListener("contextmenu", e => { e.preventDefault(); unpin(); });
     R.radar.addEventListener("pointerdown", e => {
+      if (e.button === 2) return;
       const r = R.radar.getBoundingClientRect();
       placeMarker((e.clientX - r.left) / r.width * SECTOR, (e.clientY - r.top) / r.height * SECTOR);
     });
@@ -1185,6 +1294,7 @@ const Triangulate = (() => {
     if (e.key === "ArrowLeft") { nudge(e.shiftKey ? -5 : -1); e.preventDefault(); e.stopPropagation(); }
     else if (e.key === "ArrowRight") { nudge(e.shiftKey ? 5 : 1); e.preventDefault(); e.stopPropagation(); }
     else if (e.key === " ") { lock(); e.preventDefault(); e.stopPropagation(); }
+    else if (e.key === "Delete" || e.key === "Backspace") { unpin(); e.preventDefault(); e.stopPropagation(); }
     else if (e.key === "1" || e.key === "2" || e.key === "3") { selectNode(parseInt(e.key, 10) - 1); e.preventDefault(); e.stopPropagation(); }
   }
 
@@ -1226,6 +1336,12 @@ const Triangulate = (() => {
         if (!isFinite(x) || !isFinite(y)) { term("USAGE: mark <x> <y>   (0-100 EACH)", "err"); return true; }
         return need(placeMarker(x, y), "MARKERS CAN ONLY BE PLACED DURING A CONTRACT.");
       }
+      case "unpin": case "unmark": return need(unpin(), "NO PIN TO LIFT.");
+      case "resupply": case "buy": case "refuel": {
+        if (G.state !== "DEPOT") return need(false, "THE SUPPLY DEPOT IS NOT OPEN.");
+        return need(resupply(), "NOT ENOUGH CREDITS.");
+      }
+      case "decline": case "pass": return need(decline(), "THE SUPPLY DEPOT IS NOT OPEN.");
       case "transmit": case "send": return need(transmit(), "NOTHING TO TRANSMIT RIGHT NOW.");
       default: return false;
     }
@@ -1234,7 +1350,7 @@ const Triangulate = (() => {
   /* exported for tests */
   const _test = {
     makeContract, lobe, nodeSignal, bearingTo, pointAt, angDiff, ratingFor,
-    get G() { return G; }, TOL_CLEAN, TOL_NEAR, finishContract, newShift
+    get G() { return G; }, tolClean, tolNear, coneFor, edgeDock, markerSignal, DEPOT_COST, DEPOT_FUEL, finishContract, newShift
   };
 
   return { open, handleInput, _test };
