@@ -55,117 +55,48 @@ const D9_CONFIG = {
     archiveName: "DIVISION 9 // EVIDENCE DIRECTORY",
     version: "1.0",
     prompt: "D9>",
-    categoryOrder: ["Communications", "Surveillance", "Administration", "Personnel"]
+    categoryOrder: ["Surveillance"]
 };
 
 const D9_EVIDENCE = [];
 function add(entry){ D9_EVIDENCE.push(entry); }
 
 add({
-    title: "Facility Ambient Recording",
-    category: "Communications",
-    subcategory: "Facility Audio",
-    file: "hum_60hz.mp3",
-    description: "Baseline facility hum recorded in Sublevel 2. Provided for comparison against anomalous recordings.",
-    tags: ["audio", "ambient", "baseline"],
-    related: ["Unidentified Transmission 01"],
-});
-
-add({
-    title: "Diagnostic Signal Recording",
-    category: "Communications",
-    subcategory: "Signal Analysis",
-    file: "signal_test.mp4",
-    description: "Standard carrier test pattern transmitted from Relay Station 7 during the outage window.",
-    tags: ["signal", "test", "station"],
-    related: ["Facility Ambient Recording", "Internal Memo 001 - Comms Outage"],
-});
-
-add({
-    title: "Unidentified Transmission 01",
-    category: "Communications",
-    subcategory: "Signal Analysis",
-    file: "transmission_01.mp3",
-    description: "Low-frequency signal recorded on the maintenance band. Repeats at fixed intervals. No voice content isolated.",
-    tags: ["audio", "transmission", "signal"],
-    related: ["Diagnostic Signal Recording", "Internal Memo 001 - Comms Outage"],
-});
-
-add({
-    title: "Corridor Camera Loop",
+    title: "Idle Enviroment Capture 01",
     category: "Surveillance",
-    subcategory: "Corridor B",
-    file: "cam_loop.gif",
-    description: "Short animation assembled from corridor camera frames. Lighting fluctuation visible at 2s intervals.",
-    tags: ["station", "camera", "loop"],
-    related: ["Station 7 - Corridor Photo"],
+    subcategory: "Idle Enviroment",
+    file: "idle_enviroment_capture_01.png",
+    order: 1,
 });
 
 add({
-    title: "Station 7 - Corridor Photo",
+    title: "Idle Enviroment Capture 02",
     category: "Surveillance",
-    subcategory: "Corridor B",
-    file: "station_corridor.jpg",
-    description: "Recovered still. Corridor B, Deck 3. Source of the image has not been identified.",
-    tags: ["station", "corridor", "deck3"],
-    related: ["Corridor Camera Loop", "Sublevel 2 - Access Shaft"],
+    subcategory: "Idle Enviroment",
+    file: "idle_enviroment_capture_02.png",
+    order: 2,
 });
 
 add({
-    title: "Sublevel 2 - Access Shaft",
+    title: "Idle Enviroment Capture 03",
     category: "Surveillance",
-    subcategory: "Sublevel 2",
-    file: "sublevel_02.jpg",
-    description: "Access shaft photographed during the recovery sweep. Corroborates corridor camera loop (EV-003).",
-    tags: ["sublevel", "shaft", "recovery"],
-    related: ["Station 7 - Corridor Photo", "Corridor Camera Loop"],
+    subcategory: "Idle Enviroment",
+    file: "idle_enviroment_capture_03.png",
+    order: 3,
 });
 
 add({
-    title: "Damaged Plate - Unrecoverable",
+    title: "Idle Enviroment Capture 04",
     category: "Surveillance",
-    subcategory: "Sublevel 2",
-    file: "photo_damaged.jpg",
-    description: "Index entry retained for completeness. The physical plate was destroyed before digitization. No image survives.",
-    tags: ["damaged"],
+    subcategory: "Idle Enviroment",
+    file: "idle_enviroment_capture_04.png",
+    order: 4,
 });
 
 add({
-    title: "Division Directive 9 - Cover Sheet",
-    category: "Administration",
-    subcategory: "Directives",
-    file: "directive_9.jpg",
-    description: "Scanned cover sheet of the founding directive. Full text stored under separate clearance.",
-    tags: ["directive", "document", "scan"],
-    related: ["Evidence Manifest (Excerpt)"],
-});
-
-add({
-    title: "Evidence Manifest (Excerpt)",
-    category: "Administration",
-    subcategory: "Manifests",
-    file: "manifest_002.txt",
-    description: "Partial inventory of materials transferred to this archive. Several entries redacted.",
-    tags: ["manifest", "inventory"],
-    related: ["Internal Memo 001 - Comms Outage"],
-});
-
-add({
-    title: "Internal Memo 001 - Comms Outage",
-    category: "Administration",
-    subcategory: "Memoranda",
-    file: "memo_001.txt",
-    description: "Typed memorandum describing the comms outage preceding the incident.",
-    tags: ["memo", "outage", "comms"],
-    related: ["Diagnostic Signal Recording", "Unidentified Transmission 01"],
-});
-
-add({
-    title: "Sealed Personnel Record",
-    category: "Personnel",
-    subcategory: "Sealed Records",
-    file: "personnel_record.txt",
-    description: "Sealed record. Not indexed. Access by exact title only.",
-    tags: ["personnel", "sealed"],
-    hidden: true,
+    title: "Idle Enviroment Capture 05",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_enviroment_capture_05.png",
+    order: 5,
 });
