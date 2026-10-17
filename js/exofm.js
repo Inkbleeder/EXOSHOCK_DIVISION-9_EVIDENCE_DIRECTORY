@@ -41,8 +41,10 @@ const ExoFM = (() => {
 
   /* the playlist, in play order */
   const TRACKS = [
-    /* "my_song.mp3",
-       { name: "Night Shift", file: "night_shift.mp3" }, */
+    { name: "Track 01", file: "track_01.mp3" },
+    { name: "Track 02", file: "track_02.mp3" },
+    { name: "Track 03", file: "track_03.mp3" },
+    /* more:  "my_song.mp3",   or   { name: "Night Shift", file: "night_shift.mp3" }, */
   ];
 
   const LABELS = ["88.5", "92.3", "94.1", "98.7", "101.7", "104.3", "106.9", "107.9"];
