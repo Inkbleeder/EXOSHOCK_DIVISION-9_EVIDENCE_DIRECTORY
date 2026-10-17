@@ -2,11 +2,18 @@
 /* exofm.js - EXOFM (hidden)
    Opened by typing  ExoFM  in the terminal. It is NOT in HELP or Tab completion.
 
-   A small window with a vintage ASCII radio that plays a playlist of songs on
-   loop. The speaker grille, the VU meter, the dial needle, the knobs and the
-   lamps react to the radio's own audio and nothing else: it is read through
-   an analyser that is connected only to the radio's player. Pause or stop it
-   and everything settles. No synth, no static, no made-up animation.
+   A small window with a boom box / car radio drawn in text: carry handle, a
+   display with a scrolling song title, a tuning dial, a tape deck with
+   spinning reels, a spectrum with peak-hold caps and two speakers that thump.
+   All of it reacts to the radio's own audio and nothing else: it is read
+   through an analyser that is connected only to the radio's player. Pause or
+   stop it and everything settles. No synth, no static, no made-up animation.
+
+   PUNCH
+   The analyser is tuned for bass (fine low-frequency resolution, fast attack,
+   slower release). A kick detector fires on sudden bass / mid jumps: the left
+   speaker thumps on the bass, the right on the mids, the lamps flash, the
+   whole radio swells and glows for an instant. Colours follow the site theme.
 
    THE PLAYLIST
    Put the songs in  audio/exofm/  (next to index.html) and list them in
@@ -32,9 +39,12 @@ const ExoFM = (() => {
 
   /* ================= config ================= */
 
-  const W = 36;                       /* width of the radio in characters */
-  const COLS = 28;                    /* speaker grille columns */
-  const ROWS = 5;                     /* speaker grille rows */
+  const W = 46;                       /* width of the radio in characters */
+  const INNER = 44;                   /* width inside the case */
+  const COLS = 28;                    /* analyser bands */
+  const SPEC = 14;                    /* spectrum columns on screen (2 bands each) */
+  const SROWS = 7;                    /* spectrum / speaker height */
+  const DW = 42;                      /* dial width */
   const AUDIO_DIR = "audio/exofm/";
   const MASTER_VOL = 0.8;
   const RESTART_AFTER = 3;            /* seconds: PREV restarts a song once it is this far in */
@@ -49,6 +59,10 @@ const ExoFM = (() => {
 
   const LABELS = ["88.5", "92.3", "94.1", "98.7", "101.7", "104.3", "106.9", "107.9"];
   const KNOB = ["|", "/", "-", "\\"];
+
+  /* analyser bands: 1 bin each in the lows (~47 Hz apart), then log-spaced up to ~13 kHz */
+  const EDGES = [1];
+  for (let c = 1; c <= COLS; c++) EDGES.push(Math.max(EDGES[c - 1] + 1, Math.floor(Math.pow(280, c / COLS))));
 
   /* "night_shift.mp3" -> "NIGHT SHIFT" */
   const prettify = f => String(f).split(/[?#]/)[0].split("/").pop()
@@ -72,13 +86,16 @@ const ExoFM = (() => {
   const pad2 = n => String(n).padStart(2, "0");
   const fmtT = s => { if (!isFinite(s) || s < 0) s = 0; return pad2(Math.floor(s / 60)) + ":" + pad2(Math.floor(s % 60)); };
   const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const center = s => {
-    const n = W - s.length;
-    if (n <= 0) return s.slice(0, W);
-    const l = Math.floor(n / 2);
-    return " ".repeat(l) + s + " ".repeat(n - l);
-  };
+  const fit = (s, n) => String(s).padEnd(n).slice(0, n);
+  const clean = s => String(s).replace(/[@*~^&<>"]/g, " ");     /* those characters are drawing markers */
   function term(text, cls) { if (typeof Term !== "undefined") Term.print(text, cls || "dim"); }
+
+  /* a fixed-width line you can drop strings into at a position */
+  const cv = n => {
+    const a = new Array(n).fill(" ");
+    const o = { put(p, s) { for (let i = 0; i < s.length && p + i < n; i++) a[p + i] = s[i]; return o; }, str() { return a.join(""); } };
+    return o;
+  };
 
   /* ================= state ================= */
 
@@ -96,7 +113,7 @@ const ExoFM = (() => {
     try {
       ctx = new AC();
       const master = ctx.createGain(); master.gain.value = MASTER_VOL; master.connect(ctx.destination);
-      const an = ctx.createAnalyser(); an.fftSize = 256; an.smoothingTimeConstant = 0.55; an.connect(master);
+      const an = ctx.createAnalyser(); an.fftSize = 1024; an.smoothingTimeConstant = 0.5; an.connect(master);
       const src = ctx.createMediaElementSource(el);
       src.connect(an);
       return { ctx, master, an, src, buf: new Uint8Array(an.frequencyBinCount) };
@@ -111,7 +128,7 @@ const ExoFM = (() => {
     const n = PLAYLIST.length;
     G.idx = ((i % n) + n) % n;
     G.tuneTo = n > 1 ? G.idx / (n - 1) : 0.5;
-    G.lost = false; G.flat = 0;
+    G.lost = false; G.flat = 0; G.scroll = 0;
     G.audio.src = PLAYLIST[G.idx].file;
   }
 
@@ -190,25 +207,28 @@ const ExoFM = (() => {
   function sample(dt) {
     const L = G.lvl;
     const tgt = new Array(COLS).fill(0);
-    let bassT = 0, raw = 0;
+    let bassT = 0, midT = 0, raw = 0;
 
     if (A) {
       A.an.getByteFrequencyData(A.buf);
       const b = A.buf;
       for (let c = 0; c < COLS; c++) {
-        const s = 2 + Math.floor(Math.pow(c / COLS, 1.7) * 70);
-        const e = Math.max(s + 1, 2 + Math.floor(Math.pow((c + 1) / COLS, 1.7) * 70));
         let sum = 0;
+        const s = EDGES[c], e = EDGES[c + 1];
         for (let k = s; k < e; k++) sum += b[k];
         const v = sum / (e - s) / 255;
         raw += v;
-        tgt[c] = clamp(v * 1.35, 0, 1);
+        tgt[c] = clamp(v * 1.5 * (1 + 0.8 * c / COLS), 0, 1);     /* a little tilt: highs are quieter in music */
       }
       raw /= COLS;
-      bassT = clamp((b[1] + b[2] + b[3] + b[4]) / 4 / 255 * 1.3, 0, 1);
+      bassT = clamp((b[1] + b[2] + b[3] + b[4]) / 4 / 255 * 1.35, 0, 1);
+      let m = 0;
+      for (let k = 6; k <= 40; k++) m += b[k];
+      midT = clamp(m / 35 / 255 * 1.6, 0, 1);
     }
 
-    const up = 1 - Math.exp(-dt / 0.04), down = 1 - Math.exp(-dt / 0.22);
+    /* fast attack, slower release: this is what makes it hit */
+    const up = 1 - Math.exp(-dt / 0.025), down = 1 - Math.exp(-dt / 0.16), slow = 1 - Math.exp(-dt / 0.5);
     let sum = 0;
     for (let c = 0; c < COLS; c++) {
       L[c] += (tgt[c] - L[c]) * (tgt[c] > L[c] ? up : down);
@@ -216,7 +236,24 @@ const ExoFM = (() => {
     }
     G.overall = sum / COLS;
     G.bass += (bassT - G.bass) * (bassT > G.bass ? up : down);
-    G.peak = G.bass > 0.62;
+    G.mid += (midT - G.mid) * (midT > G.mid ? up : down);
+
+    /* kick detector: a sudden jump over the recent average, then a quick fade */
+    G.bassAvg += (bassT - G.bassAvg) * slow;
+    G.midAvg += (midT - G.midAvg) * slow;
+    const kb = clamp((bassT - G.bassAvg) * 5 - 0.15, 0, 1);
+    const km = clamp((midT - G.midAvg) * 5 - 0.15, 0, 1);
+    G.kick = Math.max(G.kick * Math.exp(-dt / 0.11), kb);
+    G.kickR = Math.max(G.kickR * Math.exp(-dt / 0.11), km);
+    G.peak = G.kick > 0.5;
+
+    /* spectrum peak-hold caps: hold a moment, then fall */
+    for (let i = 0; i < SPEC; i++) {
+      const v = Math.max(L[2 * i], L[2 * i + 1]);
+      if (v >= G.pk[i]) { G.pk[i] = v; G.pkHold[i] = 0.2; }
+      else if (G.pkHold[i] > 0) G.pkHold[i] -= dt;
+      else G.pk[i] = Math.max(v, G.pk[i] - dt * 1.4);
+    }
 
     /* the song is running but the meter reads nothing (page opened from disk?) */
     const a = G.audio;
@@ -226,56 +263,107 @@ const ExoFM = (() => {
 
   /* ================= drawing ================= */
 
-  function render() {
-    const g = G, L = g.lvl;
-    const out = [];
-    const playing = g.state === "play";
-
-    const line = s => " |" + s.padEnd(32).slice(0, 32) + "| ";
-    const sub = s => line(" |" + s.padEnd(COLS).slice(0, COLS) + "| ");
-    const subTop = line(" ." + "-".repeat(COLS) + ". ");
-    const subBot = line(" '" + "-".repeat(COLS) + "' ");
-
-    /* antenna */
-    const tip = g.peak ? "*" : "o";
-    out.push(center(tip + " ".repeat(14) + tip));
-    out.push(center("\\" + " ".repeat(10) + "/"));
-    out.push(center("\\" + " ".repeat(6) + "/"));
-    out.push(" ." + "-".repeat(32) + ". ");
-
-    /* dial window: the needle sits on the song's place in the playlist and shivers with the bass */
-    const nc = clamp(Math.round(2 + g.tune * (COLS - 5) + clamp((g.bass - 0.35) * 1.5, -1, 1)), 1, COLS - 2);
-    let ticks = "";
-    for (let c = 0; c < COLS; c++) ticks += c === nc ? "|" : (c % 3 === 0 ? "." : " ");
-    out.push(subTop);
-    out.push(sub("FM 88  92  96 100 104 108"));
-    out.push(sub(ticks));
-    out.push(sub("AM 53  70  90 120 160 170"));
-    out.push(subBot);
-    out.push(line(""));
-
-    /* speaker grille */
-    out.push(subTop);
-    for (let r = 0; r < ROWS; r++) {
-      const th = (ROWS - r - 0.5) / ROWS;
-      let row = "";
-      for (let c = 0; c < COLS; c++) row += L[c] >= th ? "#" : ".";
-      out.push(sub(row));
+  /* one round speaker, 13 x 7 characters. Rings ripple outwards faster the harder
+     it is hit, the rim and dust cap flare on the kick. */
+  function speaker(rip, kick) {
+    const rows = [];
+    for (let y = 0; y < SROWS; y++) {
+      let s = "";
+      for (let x = 0; x < 13; x++) {
+        const nx = (x - 6) / 6.6, ny = (y - 3) / 3.6;
+        const d = Math.sqrt(nx * nx + ny * ny);
+        if (d > 1.02) s += " ";
+        else if (d > 0.8) s += kick > 0.4 ? "O" : "o";
+        else if (d < 0.33) s += kick > 0.35 ? "@" : "O";
+        else s += (Math.floor(d * 5 - rip) & 1) ? ":" : "#";
+      }
+      rows.push(s);
     }
-    out.push(subBot);
-    out.push(line(""));
+    return rows;
+  }
 
-    /* knobs, band switch, VU meter, lamp */
-    const k1 = KNOB[Math.floor(g.volPh) % 4], k2 = KNOB[Math.floor(g.tunePh) % 4];
-    out.push(line("  VOL" + " ".repeat(8) + "BAND" + " ".repeat(8) + "TUNE"));
-    out.push(line("  (" + k1 + ")" + " ".repeat(7) + "AM|[FM]" + " ".repeat(7) + "(" + k2 + ")"));
-    const n = Math.round(clamp(g.overall * 1.8, 0, 1) * 10);
-    const lamp = playing ? (g.peak ? "*" : "o") : " ";
-    out.push(line("  VU [" + "#".repeat(n) + "-".repeat(10 - n) + "]   ON AIR (" + lamp + ")"));
-    out.push(" '" + "-".repeat(32) + "' ");
-    out.push("  [__]" + " ".repeat(24) + "[__]  ");
+  /* markers -> colour: @ and * are hot lamps, ^ is a peak cap, ~ is the dial needle */
+  function paint(text) {
+    return text
+      .replace(/[@*]/g, '<span class="exo-hot">$&</span>')
+      .replace(/\^/g, '<span class="exo-pk">^</span>')
+      .replace(/~/g, '<span class="exo-nd">|</span>');
+  }
 
-    g.R.pre.textContent = out.join("\n");
+  function marquee(name, n, off) {
+    if (name.length <= n) return fit(name, n);
+    const loop = name + "   ";
+    const o = Math.floor(off) % loop.length;
+    return (loop + loop).slice(o, o + n);
+  }
+
+  function frameLines() {
+    const g = G, L = g.lvl;
+    const playing = g.state === "play";
+    const T = PLAYLIST[g.idx] || null;
+    const row = s => "|" + fit(s, INNER) + "|";
+    const out = [];
+
+    /* carry handle + case */
+    out.push(" ".repeat(7) + "." + "-".repeat(30) + "." + " ".repeat(7));
+    out.push(" ".repeat(7) + "|" + " ".repeat(30) + "|" + " ".repeat(7));
+    out.push("." + "-".repeat(INNER) + ".");
+    out.push(row(fit(" EXOFM // D9-EV", 31) + "FM/AM STEREO "));
+
+    /* display: station, state, track, scrolling title, time */
+    const freq = T ? T.label + " FM" : "--.- FM";
+    const state = !T ? "----" : g.lost ? "LOST" : { play: "PLAY", pause: "PAUSE", stop: "STOP" }[g.state];
+    const trk = T ? "TR " + pad2(g.idx + 1) + "/" + pad2(PLAYLIST.length) : "TR --/--";
+    const dur = g.audio.duration;
+    const time = T ? fmtT(g.audio.currentTime) + "/" + (isFinite(dur) ? fmtT(dur) : "--:--") : "--:--/--:--";
+    const name = T ? clean(T.name) : "NO TAPE LOADED";
+    out.push(row(" ." + "-".repeat(40) + ". "));
+    out.push(row(" |" + fit(" " + freq.padEnd(10) + state.padEnd(8) + trk, 40) + "| "));
+    out.push(row(" |" + fit(" " + marquee(name, 26, g.scroll) + "  " + time, 40) + "| "));
+    out.push(row(" '" + "-".repeat(40) + "' "));
+
+    /* dial: the needle sits on the song's place in the playlist and jolts on the kick */
+    const shiv = Math.round(clamp((g.kick - 0.25) * 2.4, -1, 1));
+    const nc = clamp(Math.round(2 + g.tune * (DW - 5)) + shiv, 1, DW - 2);
+    let ticks = "";
+    for (let c = 0; c < DW; c++) ticks += c === nc ? "~" : (c % 3 === 0 ? "." : " ");
+    out.push(row(" " + fit("FM 88    92    96   100   104   108", DW) + " "));
+    out.push(row(" " + ticks + " "));
+    out.push(row(" " + fit("AM 53   70    90   120  160  170", DW) + " "));
+
+    /* tape deck: the reels turn while a song is running */
+    const r1 = KNOB[Math.floor(g.reelPh) % 4], r2 = KNOB[(Math.floor(g.reelPh) + 2) % 4];
+    out.push(row(" (" + r1 + ")" + "=".repeat(11) + "[ EXOFM C-60 ]" + "=".repeat(11) + "(" + r2 + ") "));
+
+    /* speakers either side of the spectrum. left = bass, right = mids */
+    const sl = speaker(g.ripL, g.kick), sr = speaker(g.ripR, g.kickR);
+    for (let r = 0; r < SROWS; r++) {
+      const t = (SROWS - r - 0.5) / SROWS;
+      let sp = "";
+      for (let i = 0; i < SPEC; i++) {
+        const v = Math.max(L[2 * i], L[2 * i + 1]);
+        const cap = SROWS - 1 - Math.min(SROWS - 1, Math.floor(g.pk[i] * SROWS));
+        sp += v >= t ? "#" : (r === cap && g.pk[i] > 0.04 ? "^" : " ");
+      }
+      out.push(row(" " + sl[r] + "|" + sp + "|" + sr[r] + " "));
+    }
+
+    /* knobs, band switch, VU meter, lamps */
+    const k1 = KNOB[Math.floor(g.volPh) % 4], k2 = KNOB[Math.floor(g.balPh) % 4], k3 = KNOB[Math.floor(g.tunePh) % 4];
+    out.push(row(cv(INNER).put(2, "VOL").put(12, "BAL").put(21, "BAND").put(34, "TUNE").str()));
+    out.push(row(cv(INNER).put(2, "(" + k1 + ")").put(12, "(" + k2 + ")").put(19, "AM|[FM]").put(33, "(" + k3 + ")").str()));
+    const n = Math.round(clamp(g.overall * 2.2, 0, 1) * 10);
+    const lamp = playing ? (g.kick > 0.4 ? "*" : "o") : " ";
+    out.push(row(cv(INNER).put(2, "VU [" + "#".repeat(n) + "-".repeat(10 - n) + "]")
+      .put(22, "ON AIR (" + lamp + ")").put(36, "PK(" + (g.kick > 0.5 ? "*" : "-") + ")").str()));
+    out.push("'" + "-".repeat(INNER) + "'");
+    out.push(" ".repeat(4) + "[____]" + " ".repeat(26) + "[____]" + " ".repeat(4));
+    return out;
+  }
+
+  function render() {
+    const html = paint(frameLines().join("\n"));
+    if (html !== G.html) { G.html = html; G.R.pre.innerHTML = html; }
   }
 
   function statusText() {
@@ -327,9 +415,19 @@ const ExoFM = (() => {
       if (A) A.master.gain.value = muted ? 0 : MASTER_VOL;
       else G.audio.muted = muted;
       sample(dt);
-      G.tune += (G.tuneTo - G.tune) * (1 - Math.exp(-dt / 0.25));
-      G.volPh += dt * G.overall * 14;
-      G.tunePh += dt * G.bass * 9;
+      G.tune += (G.tuneTo - G.tune) * (1 - Math.exp(-dt / 0.2));
+      G.volPh += dt * G.overall * 16;
+      G.balPh += dt * G.mid * 12;
+      G.tunePh += dt * G.bass * 12;
+      G.ripL += dt * (1.2 + G.bass * 10 + G.kick * 8);
+      G.ripR += dt * (1.2 + G.mid * 10 + G.kickR * 8);
+      G.reelPh += dt * (G.state === "play" ? 3 + G.overall * 16 : 0);
+      G.scroll += dt * 5;
+
+      /* the whole radio swells and glows with the hit (see .exo-pre in style.css) */
+      const kk = Math.max(G.kick, G.kickR * 0.7).toFixed(2);
+      if (kk !== G.kk) { G.kk = kk; G.R.pre.style.setProperty("--k", kk); }
+
       render();
       syncKeys();
       const txt = statusText();
@@ -369,13 +467,15 @@ const ExoFM = (() => {
     G = {
       root, R, win: null, raf: 0, last: performance.now(), audio: el,
       state: "stop", idx: 0, tune: 0.5, tuneTo: 0.5, lost: false, fails: 0,
-      lvl: new Array(COLS).fill(0), bass: 0, overall: 0, peak: false,
-      volPh: 0, tunePh: 0, flat: 0, statTxt: "", keyState: ""
+      lvl: new Array(COLS).fill(0), pk: new Array(SPEC).fill(0), pkHold: new Array(SPEC).fill(0),
+      bass: 0, mid: 0, bassAvg: 0, midAvg: 0, kick: 0, kickR: 0, overall: 0, peak: false,
+      volPh: 0, balPh: 0, tunePh: 0, ripL: 0, ripR: 0, reelPh: 0, scroll: 0,
+      flat: 0, statTxt: "", keyState: "", html: "", kk: ""
     };
 
     G.win = WinMgr.create({
       title: "EXOFM", content: root, label: "EXOFM", tag: "exofm",
-      w: 330, h: 530, onClose: teardown
+      w: 372, h: 548, onClose: teardown
     });
 
     root.addEventListener("click", e => {
