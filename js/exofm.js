@@ -17,7 +17,7 @@
    site theme.
 
    THE PLAYLIST
-   Put the songs in  audio/exofm/  (next to index.html) and list them in
+   Put the songs in  audio/  (next to index.html) and list them in
    TRACKS below, in the order they should play. When the last song ends the
    first one starts again. A plain file name is enough (the title is made from
    the file name), or give a title:
@@ -45,7 +45,7 @@ const ExoFM = (() => {
   const SPEC = 14;                    /* spectrum columns on screen (2 bands each) */
   const SROWS = 7;                    /* spectrum / speaker height */
   const DW = 42;                      /* dial width */
-  const AUDIO_DIR = "audio/exofm/";
+  const AUDIO_DIR = "audio/";
   const MASTER_VOL = 0.8;
   const RESTART_AFTER = 3;            /* seconds: PREV restarts a song once it is this far in */
 
