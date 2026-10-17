@@ -417,6 +417,10 @@ const Term = (() => {
        commands (bearing, lock, transmit ...). Anything else falls through. */
     if (typeof Triangulate !== "undefined" && Triangulate.handleInput(raw)) return;
 
+    /* hidden radio (js/exofm.js): opens on its secret command, then answers
+       exofm next / prev / off / close. Anything else falls through. */
+    if (typeof ExoFM !== "undefined" && ExoFM.handleInput(raw)) return;
+
     const tokens = raw.split(/\s+/);
 
     const name = resolveCmd(tokens[0]);
