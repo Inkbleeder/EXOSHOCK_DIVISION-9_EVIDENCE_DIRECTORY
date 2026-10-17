@@ -55,7 +55,7 @@ const D9_CONFIG = {
     archiveName: "DIVISION 9 // EVIDENCE DIRECTORY",
     version: "1.0",
     prompt: "D9>",
-    categoryOrder: ["Surveillance", "Administration"]
+    categoryOrder: ["Surveillance", "Administration", "Personnel"]
 };
 
 const D9_EVIDENCE = [];
@@ -65,7 +65,7 @@ add({
     title: "Idle Enviroment Capture 01",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
-    file: "idle_enviroment_capture_01.png",
+    file: "idle_environment_capture_01.png",
     order: 1,
 });
 
@@ -73,7 +73,7 @@ add({
     title: "Idle Enviroment Capture 02",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
-    file: "idle_enviroment_capture_02.png",
+    file: "idle_environment_capture_02.png",
     order: 2,
 });
 
@@ -81,7 +81,7 @@ add({
     title: "Idle Enviroment Capture 03",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
-    file: "idle_enviroment_capture_03.png",
+    file: "idle_environment_capture_03.png",
     order: 3,
 });
 
@@ -89,7 +89,7 @@ add({
     title: "Idle Enviroment Capture 04",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
-    file: "idle_enviroment_capture_04.png",
+    file: "idle_environment_capture_04.png",
     order: 4,
 });
 
@@ -97,43 +97,46 @@ add({
     title: "Idle Enviroment Capture 05",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
-    file: "idle_enviroment_capture_05.png",
+    file: "idle_environment_capture_05.png",
     order: 5,
 });
 
 add({
-    title: "Corrupted Feed 01",
+    title: "Idle Enviroment Capture 06",
     category: "Surveillance",
-    subcategory: "Corrupted",
-    file: "corrupted_feed_01.png",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_06.png",
+    order: 6,
+});
+
+add({
+    title: "BSLSK-Div9-Founders_Patch",
+    category: "Administration",
+    subcategory: "Insignia",
+    file: "BSLSK-Div9-Founders_Patch.png",
     order: 1,
 });
 
 add({
-    title: "Corrupted Feed 02",
-    category: "Surveillance",
-    subcategory: "Corrupted",
-    file: "corrupted_feed_02.png",
+    title: "BSLSK-Div9-Maw_Patch",
+    category: "Administration",
+    subcategory: "Insignia",
+    file: "BSLSK-Div9-Maw_Patch.png",
     order: 2,
 });
 
 add({
-    title: "Laboratory Corridor",
-    category: "Surveillance",
-    subcategory: "Laboratory",
-    file: "laboratory_corridor.png",
+    title: "BSLSK-Div9-Operative(as last seen by contract HVT)-INS_ONE",
+    category: "Personnel",
+    subcategory: "Operative",
+    file: "BSLSK-Div9-Operative(as last seen by contract HVT)-INS_ONE.png",
+    order: 1,
 });
 
 add({
-    title: "Armour Mask Map",
-    category: "Administration",
-    subcategory: "Schematics",
-    file: "armour_mask_map.png",
-});
-
-add({
-    title: "Division Emblem",
-    category: "Administration",
-    subcategory: "Insignia",
-    file: "division_emblem.png",
+    title: "BSLSK-Div9-Operative-Armor-Map",
+    category: "Personnel",
+    subcategory: "Operative",
+    file: "BSLSK-Div9-Operative-Armor-Map.png",
+    order: 2,
 });
