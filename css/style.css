@@ -1462,6 +1462,46 @@ html, body, * {
 .scr-body .sq{ color:var(--green); }
 .scr-body .ci{ color:var(--green); }
 
+/* ===========================================================
+   EXOFM (hidden radio, js/exofm.js)
+   An ASCII radio in a small window. The <pre> is redrawn every
+   frame from the live audio, so the font must be monospaced.
+   =========================================================== */
+
+.exo-root{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    height:100%;
+}
+
+.exo-pre{
+    margin:0;
+    font-family:"Courier New", monospace;
+    font-size:13px;
+    line-height:1.15;
+    white-space:pre;
+    color:var(--green);
+    text-shadow:0 0 6px rgba(var(--green-rgb),.45);
+    user-select:none;
+}
+
+.exo-stat{
+    font-size:11px;
+    letter-spacing:1px;
+    line-height:1.5;
+    text-align:center;
+    opacity:.75;
+}
+
+.exo-btns{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:6px;
+}
+
 @media (max-width:700px){
     .tri-left{ max-width:none; }
     .tri-side{ flex:1 1 100%; }
