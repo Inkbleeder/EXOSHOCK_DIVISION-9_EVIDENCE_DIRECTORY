@@ -2,10 +2,10 @@
 /* exofm.js - EXOFM (hidden)
    Opened by typing  ExoFM  in the terminal. It is NOT in HELP or Tab completion.
 
-   A small window with a boom box / car radio drawn in text: carry handle, a
-   display with a scrolling song title, a tuning dial, a tape deck with
-   spinning reels, a spectrum with peak-hold caps and two speakers that thump.
-   All of it reacts to the radio's own audio and nothing else: it is read
+   A small window that IS the radio: no drawn case, just the parts. A display
+   with a scrolling song title, a tuning dial, a spectrum with peak-hold caps,
+   two speakers that thump, a VU meter, and the five keys. The window's own
+   frame and title bar pulse with the music. All of it reacts to the radio's own audio and nothing else: it is read
    through an analyser that is connected only to the radio's player. Pause or
    stop it and everything settles. No synth, no static, no made-up animation.
 
@@ -13,7 +13,8 @@
    The analyser is tuned for bass (fine low-frequency resolution, fast attack,
    slower release). A kick detector fires on sudden bass / mid jumps: the left
    speaker thumps on the bass, the right on the mids, the lamps flash, the
-   whole radio swells and glows for an instant. Colours follow the site theme.
+   window glows and its title bar lights up for an instant. Colours follow the
+   site theme.
 
    THE PLAYLIST
    Put the songs in  audio/exofm/  (next to index.html) and list them in
@@ -39,8 +40,7 @@ const ExoFM = (() => {
 
   /* ================= config ================= */
 
-  const W = 46;                       /* width of the radio in characters */
-  const INNER = 44;                   /* width inside the case */
+  const W = 42;                       /* width of the radio in characters */
   const COLS = 28;                    /* analyser bands */
   const SPEC = 14;                    /* spectrum columns on screen (2 bands each) */
   const SROWS = 7;                    /* spectrum / speaker height */
@@ -291,7 +291,7 @@ const ExoFM = (() => {
   }
 
   function marquee(name, n, off) {
-    if (name.length <= n) return fit(name, n);
+    if (name.length <= n) return fit(" ".repeat(Math.floor((n - name.length) / 2)) + name, n);
     const loop = name + "   ";
     const o = Math.floor(off) % loop.length;
     return (loop + loop).slice(o, o + n);
@@ -301,39 +301,29 @@ const ExoFM = (() => {
     const g = G, L = g.lvl;
     const playing = g.state === "play";
     const T = PLAYLIST[g.idx] || null;
-    const row = s => "|" + fit(s, INNER) + "|";
+    const rule = "-".repeat(W);
     const out = [];
 
-    /* carry handle + case */
-    out.push(" ".repeat(7) + "." + "-".repeat(30) + "." + " ".repeat(7));
-    out.push(" ".repeat(7) + "|" + " ".repeat(30) + "|" + " ".repeat(7));
-    out.push("." + "-".repeat(INNER) + ".");
-    out.push(row(fit(" EXOFM // D9-EV", 31) + "FM/AM STEREO "));
-
-    /* display: station, state, track, scrolling title, time */
+    /* display: station, state, track, time, then the scrolling title */
     const freq = T ? T.label + " FM" : "--.- FM";
     const state = !T ? "----" : g.lost ? "LOST" : { play: "PLAY", pause: "PAUSE", stop: "STOP" }[g.state];
     const trk = T ? "TR " + pad2(g.idx + 1) + "/" + pad2(PLAYLIST.length) : "TR --/--";
     const dur = g.audio.duration;
     const time = T ? fmtT(g.audio.currentTime) + "/" + (isFinite(dur) ? fmtT(dur) : "--:--") : "--:--/--:--";
     const name = T ? clean(T.name) : "NO TAPE LOADED";
-    out.push(row(" ." + "-".repeat(40) + ". "));
-    out.push(row(" |" + fit(" " + freq.padEnd(10) + state.padEnd(8) + trk, 40) + "| "));
-    out.push(row(" |" + fit(" " + marquee(name, 26, g.scroll) + "  " + time, 40) + "| "));
-    out.push(row(" '" + "-".repeat(40) + "' "));
+    out.push(cv(W).put(0, freq).put(11, state).put(20, trk).put(W - time.length, time).str());
+    out.push(marquee(name, W, g.scroll));
+    out.push(rule);
 
     /* dial: the needle sits on the song's place in the playlist and jolts on the kick */
     const shiv = Math.round(clamp((g.kick - 0.25) * 2.4, -1, 1));
     const nc = clamp(Math.round(2 + g.tune * (DW - 5)) + shiv, 1, DW - 2);
     let ticks = "";
     for (let c = 0; c < DW; c++) ticks += c === nc ? "~" : (c % 3 === 0 ? "." : " ");
-    out.push(row(" " + fit("FM 88    92    96   100   104   108", DW) + " "));
-    out.push(row(" " + ticks + " "));
-    out.push(row(" " + fit("AM 53   70    90   120  160  170", DW) + " "));
-
-    /* tape deck: the reels turn while a song is running */
-    const r1 = KNOB[Math.floor(g.reelPh) % 4], r2 = KNOB[(Math.floor(g.reelPh) + 2) % 4];
-    out.push(row(" (" + r1 + ")" + "=".repeat(11) + "[ EXOFM C-60 ]" + "=".repeat(11) + "(" + r2 + ") "));
+    out.push(fit("FM 88    92    96   100   104   108", DW));
+    out.push(ticks);
+    out.push(fit("AM 53   70    90   120  160  170", DW));
+    out.push(rule);
 
     /* speakers either side of the spectrum. left = bass, right = mids */
     const sl = speaker(g.ripL, g.kick), sr = speaker(g.ripR, g.kickR);
@@ -345,19 +335,16 @@ const ExoFM = (() => {
         const cap = SROWS - 1 - Math.min(SROWS - 1, Math.floor(g.pk[i] * SROWS));
         sp += v >= t ? "#" : (r === cap && g.pk[i] > 0.04 ? "^" : " ");
       }
-      out.push(row(" " + sl[r] + "|" + sp + "|" + sr[r] + " "));
+      out.push(sl[r] + " " + sp + " " + sr[r]);
     }
+    out.push(rule);
 
-    /* knobs, band switch, VU meter, lamps */
-    const k1 = KNOB[Math.floor(g.volPh) % 4], k2 = KNOB[Math.floor(g.balPh) % 4], k3 = KNOB[Math.floor(g.tunePh) % 4];
-    out.push(row(cv(INNER).put(2, "VOL").put(12, "BAL").put(21, "BAND").put(34, "TUNE").str()));
-    out.push(row(cv(INNER).put(2, "(" + k1 + ")").put(12, "(" + k2 + ")").put(19, "AM|[FM]").put(33, "(" + k3 + ")").str()));
+    /* knobs, VU meter, lamps */
+    const k1 = KNOB[Math.floor(g.volPh) % 4], k3 = KNOB[Math.floor(g.tunePh) % 4];
     const n = Math.round(clamp(g.overall * 2.2, 0, 1) * 10);
     const lamp = playing ? (g.kick > 0.4 ? "*" : "o") : " ";
-    out.push(row(cv(INNER).put(2, "VU [" + "#".repeat(n) + "-".repeat(10 - n) + "]")
-      .put(22, "ON AIR (" + lamp + ")").put(36, "PK(" + (g.kick > 0.5 ? "*" : "-") + ")").str()));
-    out.push("'" + "-".repeat(INNER) + "'");
-    out.push(" ".repeat(4) + "[____]" + " ".repeat(26) + "[____]" + " ".repeat(4));
+    out.push(cv(W).put(0, "(" + k1 + ")").put(4, "VU [" + "#".repeat(n) + "-".repeat(10 - n) + "]")
+      .put(21, "ON AIR (" + lamp + ")").put(32, "PK(" + (g.kick > 0.5 ? "*" : "-") + ")").put(39, "(" + k3 + ")").str());
     return out;
   }
 
@@ -366,20 +353,12 @@ const ExoFM = (() => {
     if (html !== G.html) { G.html = html; G.R.pre.innerHTML = html; }
   }
 
+  /* the display already shows station, song and time: this line is only for problems */
   function statusText() {
-    if (!PLAYLIST.length) return "NO TAPE LOADED<br>&nbsp;<br>&nbsp;";
-    const t = PLAYLIST[G.idx];
-    const a = "TRACK " + pad2(G.idx + 1) + "/" + pad2(PLAYLIST.length) + " // " + t.label + " FM";
-    let b;
-    if (G.lost) b = "NO SIGNAL";
-    else {
-      const nm = t.name.length > 24 ? t.name.slice(0, 21) + "..." : t.name;
-      b = (G.state === "play" ? "PLAYING: " : G.state === "pause" ? "PAUSED: " : "STOPPED: ") + esc(nm);
-    }
-    const dur = G.audio.duration;
-    const c = G.flat > 2.5 ? "METER NEEDS HTTP (NOT FILE://)"
-      : fmtT(G.audio.currentTime) + " / " + (isFinite(dur) ? fmtT(dur) : "--:--");
-    return a + "<br>" + b + "<br>" + c;
+    if (!PLAYLIST.length) return "NO TAPE LOADED";
+    if (G.lost) return "NO SIGNAL";
+    if (G.flat > 2.5) return "METER NEEDS HTTP (NOT FILE://)";
+    return "";
   }
 
   /* PLAY / PAUSE / STOP stay down to show the mode */
@@ -424,14 +403,14 @@ const ExoFM = (() => {
       G.reelPh += dt * (G.state === "play" ? 3 + G.overall * 16 : 0);
       G.scroll += dt * 5;
 
-      /* the whole radio swells and glows with the hit (see .exo-pre in style.css) */
+      /* the window itself glows and its title bar lights up with the hit (see .exo-win in style.css) */
       const kk = Math.max(G.kick, G.kickR * 0.7).toFixed(2);
-      if (kk !== G.kk) { G.kk = kk; G.R.pre.style.setProperty("--k", kk); }
+      if (kk !== G.kk) { G.kk = kk; G.win.el.style.setProperty("--k", kk); }
 
       render();
       syncKeys();
       const txt = statusText();
-      if (txt !== G.statTxt) { G.statTxt = txt; G.R.stat.innerHTML = txt; }
+      if (txt !== G.statTxt) { G.statTxt = txt; G.R.stat.textContent = txt; }
     } catch (e) { /* decorative only */ }
   }
 
@@ -475,8 +454,9 @@ const ExoFM = (() => {
 
     G.win = WinMgr.create({
       title: "EXOFM", content: root, label: "EXOFM", tag: "exofm",
-      w: 372, h: 548, onClose: teardown
+      w: 336, h: 360, onClose: teardown
     });
+    G.win.el.classList.add("exo-win");
 
     root.addEventListener("click", e => {
       const b = e.target.closest("[data-a]");
