@@ -80,9 +80,18 @@ const Media = (() => {
     box.className = "media-box";
     const img = document.createElement("img");
     img.alt = ev.title;
-    img.src = ev.file;
+    /* If the file will not load, try the same name with the other common image
+       extensions, so a record still opens when the file is a .jpg but is listed
+       as .png (or the other way round). */
+    const base = ev.file.replace(/\.[a-z0-9]+$/i, "");
+    const alts = ["png", "jpg", "jpeg", "webp"].filter(x => !ev.file.toLowerCase().endsWith("." + x));
     img.onload = () => { overlay.remove(); loadedCount++; };
-    img.onerror = () => { overlay.remove(); box.appendChild(failBox(ev)); };
+    img.onerror = () => {
+      const next = ev.type === "gif" ? null : alts.shift();
+      if (next) { img.src = base + "." + next; return; }
+      overlay.remove(); box.appendChild(failBox(ev));
+    };
+    img.src = ev.file;
     box.appendChild(img);
     wrap.appendChild(box);
 
