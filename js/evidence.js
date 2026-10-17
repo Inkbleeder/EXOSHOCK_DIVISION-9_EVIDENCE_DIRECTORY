@@ -55,7 +55,7 @@ const D9_CONFIG = {
     archiveName: "DIVISION 9 // EVIDENCE DIRECTORY",
     version: "1.0",
     prompt: "D9>",
-    categoryOrder: ["Surveillance"]
+    categoryOrder: ["Surveillance", "Administration"]
 };
 
 const D9_EVIDENCE = [];
@@ -99,4 +99,41 @@ add({
     subcategory: "Idle Enviroment",
     file: "idle_enviroment_capture_05.png",
     order: 5,
+});
+
+add({
+    title: "Corrupted Feed 01",
+    category: "Surveillance",
+    subcategory: "Corrupted",
+    file: "corrupted_feed_01.png",
+    order: 1,
+});
+
+add({
+    title: "Corrupted Feed 02",
+    category: "Surveillance",
+    subcategory: "Corrupted",
+    file: "corrupted_feed_02.png",
+    order: 2,
+});
+
+add({
+    title: "Laboratory Corridor",
+    category: "Surveillance",
+    subcategory: "Laboratory",
+    file: "laboratory_corridor.png",
+});
+
+add({
+    title: "Armour Mask Map",
+    category: "Administration",
+    subcategory: "Schematics",
+    file: "armour_mask_map.png",
+});
+
+add({
+    title: "Division Emblem",
+    category: "Administration",
+    subcategory: "Insignia",
+    file: "division_emblem.png",
 });
