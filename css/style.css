@@ -1495,12 +1495,53 @@ html, body, * {
     opacity:.75;
 }
 
-.exo-btns{
+/* the transport keys: raised on a ledge, they sink when pressed. PLAY / PAUSE /
+   STOP get .latched (stay down) to show the mode, like an old tape deck. */
+.exo-keys{
     display:flex;
-    flex-wrap:wrap;
     justify-content:center;
-    gap:6px;
+    gap:5px;
+    padding:8px 8px 10px;
+    border:1px solid var(--border);
+    background:rgba(var(--green-rgb),.05);
+    box-shadow:inset 0 0 12px rgba(0,0,0,.45);
 }
+
+.exo-key{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:2px;
+    min-width:52px;
+    padding:6px 4px 5px;
+    font-family:inherit;
+    color:var(--green);
+    background:rgba(var(--green-rgb),.1);
+    border:1px solid var(--green);
+    box-shadow:0 4px 0 rgba(var(--green-rgb),.5);
+    text-shadow:none;
+    cursor:pointer;
+    transform:translateY(0);
+    transition:transform .06s ease-out, box-shadow .06s ease-out, background .06s;
+}
+.exo-key b{ font-size:14px; letter-spacing:1px; line-height:1.1; }
+.exo-key i{ font-style:normal; font-size:9px; letter-spacing:1px; opacity:.75; }
+
+.exo-key:hover{ background:rgba(var(--green-rgb),.18); }
+
+.exo-key:active,
+.exo-key.tap,
+.exo-key.latched{
+    transform:translateY(3px);
+    box-shadow:0 1px 0 rgba(var(--green-rgb),.5);
+    background:rgba(var(--green-rgb),.28);
+}
+
+.exo-key.latched{
+    background:rgba(var(--green-rgb),.38);
+    box-shadow:0 1px 0 rgba(var(--green-rgb),.5), inset 0 0 8px rgba(var(--green-rgb),.35);
+}
+.exo-key.latched i{ opacity:1; }
 
 @media (max-width:700px){
     .tri-left{ max-width:none; }
