@@ -1471,24 +1471,24 @@ html, body, * {
 .exo-root{
     display:flex;
     flex-direction:column;
-    align-items:center;
-    gap:8px;
+    align-items:stretch;
     height:100%;
 }
 
-/* --k (0..1) is set every frame from the kick detector in exofm.js: on a hit the
-   whole radio swells a touch and its glow flares, then settles. */
+/* --k (0..1) is set on the window every frame from the kick detector in exofm.js
+   and inherited here: on a hit the drawing swells a touch and its glow flares. */
 .exo-pre{
-    --k:0;
+    align-self:center;
     margin:0;
+    padding:12px 0 8px;
     font-family:"Courier New", monospace;
     font-size:12px;
     line-height:1.15;
     white-space:pre;
     color:var(--green);
-    text-shadow:0 0 calc(4px + var(--k) * 14px) rgba(var(--green-rgb), calc(.4 + var(--k) * .5));
-    transform:scale(calc(1 + var(--k) * .018));
-    transform-origin:50% 55%;
+    text-shadow:0 0 calc(4px + var(--k, 0) * 14px) rgba(var(--green-rgb), calc(.4 + var(--k, 0) * .5));
+    transform:scale(calc(1 + var(--k, 0) * .014));
+    transform-origin:50% 50%;
     user-select:none;
 }
 
@@ -1507,12 +1507,13 @@ html, body, * {
 }
 
 .exo-stat{
+    padding:0 10px 6px;
     font-size:11px;
     letter-spacing:1px;
-    line-height:1.5;
     text-align:center;
-    opacity:.75;
+    color:var(--yellow);
 }
+.exo-stat:empty{ display:none; }
 
 /* the transport keys: raised on a ledge, they sink when pressed. PLAY / PAUSE /
    STOP get .latched (stay down) to show the mode, like an old tape deck. */
@@ -1520,10 +1521,10 @@ html, body, * {
     display:flex;
     justify-content:center;
     gap:5px;
-    padding:8px 8px 10px;
-    border:1px solid var(--border);
+    margin-top:auto;
+    padding:9px 8px 11px;
+    border-top:1px solid var(--border);
     background:rgba(var(--green-rgb),.05);
-    box-shadow:inset 0 0 12px rgba(0,0,0,.45);
 }
 
 .exo-key{
@@ -1561,6 +1562,20 @@ html, body, * {
     box-shadow:0 1px 0 rgba(var(--green-rgb),.5), inset 0 0 8px rgba(var(--green-rgb),.35);
 }
 .exo-key.latched i{ opacity:1; }
+
+/* the window is the radio: its frame glows and its title bar lights up on every hit */
+.d9-window.exo-win{
+    box-shadow:
+        0 0 calc(14px + var(--k, 0) * 30px) rgba(var(--green-rgb), calc(.28 + var(--k, 0) * .5)),
+        inset 0 0 30px rgba(var(--green-rgb), .05);
+}
+.d9-window.exo-win .win-header{
+    background:rgba(var(--green-rgb), calc(.12 + var(--k, 0) * .24));
+}
+.exo-win .win-body{
+    padding:0;
+    overflow:hidden;
+}
 
 @media (max-width:700px){
     .tri-left{ max-width:none; }
