@@ -62,7 +62,7 @@ const D9_EVIDENCE = [];
 function add(entry){ D9_EVIDENCE.push(entry); }
 
 add({
-    title: "Idle Environment Capture 01",
+    title: "Idle Environment Capture 01 (Lobby)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_01.png",
@@ -70,7 +70,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture 02",
+    title: "Idle Environment Capture 02 (Unknown Data Screens)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_02.png",
@@ -78,7 +78,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture 03",
+    title: "Idle Environment Capture 03 (Hallway)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_03.png",
@@ -86,7 +86,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture 04",
+    title: "Idle Environment Capture 04 (Internal Component of Unknown Function)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_04.png",
@@ -94,7 +94,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture 05",
+    title: "Idle Environment Capture 05 (Lower Decks)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_05.png",
@@ -102,7 +102,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture 06",
+    title: "Idle Environment Capture 06 (Unknown Liquid Containers)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_06.png",
@@ -150,7 +150,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture - Combat Detected 02",
+    title: "Idle Environment Capture - Breach Detected 02",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture(combat-detected)_02.png",
