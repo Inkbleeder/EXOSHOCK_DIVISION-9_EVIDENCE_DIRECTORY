@@ -140,3 +140,67 @@ add({
     file: "BSLSK-Div9-Operative-Armor-Map.png",
     order: 2,
 });
+
+add({
+    title: "Idle Environment Capture - Combat Detected 01",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_combat-detected__01.png",
+    order: 7,
+});
+
+add({
+    title: "Idle Environment Capture - Combat Detected 02",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_combat-detected__02.png",
+    order: 8,
+});
+
+add({
+    title: "Idle Drone Camera Feed - Mode Inactive",
+    category: "Surveillance",
+    subcategory: "Drone Camera Feed",
+    file: "idle_drone-camera-feed_MODE_inactive_.png",
+    order: 1,
+});
+
+add({
+    title: "Mid-Contract Chest Camera - Active Combat Detected 01",
+    category: "Surveillance",
+    subcategory: "Operative Chest Camera",
+    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected__01.png",
+    order: 1,
+});
+
+add({
+    title: "Mid-Contract Chest Camera - Active Combat Detected 02",
+    category: "Surveillance",
+    subcategory: "Operative Chest Camera",
+    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected__02.png",
+    order: 2,
+});
+
+add({
+    title: "Mid-Contract Chest Camera - Active Combat Detected 03",
+    category: "Surveillance",
+    subcategory: "Operative Chest Camera",
+    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected__03.png",
+    order: 3,
+});
+
+add({
+    title: "Mid-Contract Chest Camera - Active Combat Detected 04",
+    category: "Surveillance",
+    subcategory: "Operative Chest Camera",
+    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected__04.png",
+    order: 4,
+});
+
+add({
+    title: "Mid-Contract Chest Camera - Active Combat Detected 05",
+    category: "Surveillance",
+    subcategory: "Operative Chest Camera",
+    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected__05.png",
+    order: 5,
+});
