@@ -142,7 +142,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture - Combat Detected 01",
+    title: "Idle Environment Capture - Combat Detected",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture(combat-detected)_01.png",
@@ -150,7 +150,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture - Breach Detected 02",
+    title: "Idle Environment Capture - Breach Detected",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture(combat-detected)_02.png",
