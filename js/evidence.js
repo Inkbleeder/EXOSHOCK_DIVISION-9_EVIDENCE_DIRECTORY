@@ -145,7 +145,7 @@ add({
     title: "Idle Environment Capture - Combat Detected 01",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
-    file: "idle_environment_capture_combat-detected__01.png",
+    file: "idle_environment_capture_combat-detected_01.png",
     order: 7,
 });
 
@@ -153,7 +153,7 @@ add({
     title: "Idle Environment Capture - Combat Detected 02",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
-    file: "idle_environment_capture_combat-detected__02.png",
+    file: "idle_environment_capture_combat-detected_02.png",
     order: 8,
 });
 
@@ -161,7 +161,7 @@ add({
     title: "Idle Drone Camera Feed - Mode Inactive",
     category: "Surveillance",
     subcategory: "Drone Camera Feed",
-    file: "idle_drone-camera-feed_MODE_inactive_.png",
+    file: "idle_drone-camera-feed_MODE_inactive.png",
     order: 1,
 });
 
@@ -169,7 +169,7 @@ add({
     title: "Mid-Contract Chest Camera - Active Combat Detected 01",
     category: "Surveillance",
     subcategory: "Operative Chest Camera",
-    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected__01.png",
+    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected_01.png",
     order: 1,
 });
 
@@ -177,7 +177,7 @@ add({
     title: "Mid-Contract Chest Camera - Active Combat Detected 02",
     category: "Surveillance",
     subcategory: "Operative Chest Camera",
-    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected__02.png",
+    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected_02.png",
     order: 2,
 });
 
@@ -185,7 +185,7 @@ add({
     title: "Mid-Contract Chest Camera - Active Combat Detected 03",
     category: "Surveillance",
     subcategory: "Operative Chest Camera",
-    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected__03.png",
+    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected_03.png",
     order: 3,
 });
 
@@ -193,7 +193,7 @@ add({
     title: "Mid-Contract Chest Camera - Active Combat Detected 04",
     category: "Surveillance",
     subcategory: "Operative Chest Camera",
-    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected__04.png",
+    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected_04.png",
     order: 4,
 });
 
@@ -201,7 +201,7 @@ add({
     title: "Mid-Contract Chest Camera - Active Combat Detected 05",
     category: "Surveillance",
     subcategory: "Operative Chest Camera",
-    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected__05.png",
+    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected_05.png",
     order: 5,
 });
 
@@ -209,7 +209,7 @@ add({
     title: "Support Item Drone - Idle Environment Capture",
     category: "Surveillance",
     subcategory: "Drone Camera Feed",
-    file: "support_item_drone__idle_environment_capture.png",
+    file: "support_item_drone_idle_environment_capture.png",
     order: 2,
 });
 
@@ -217,7 +217,7 @@ add({
     title: "Zephyr Construct Internal Camera Relay - Contract In Progress 01",
     category: "Surveillance",
     subcategory: "Zephyr Construct Camera Relay",
-    file: "zephyr-construct-internal-camera-relay-_contract-in-progress_-01.png",
+    file: "zephyr-construct-internal-camera-relay-contract-in-progress-01.png",
     order: 1,
 });
 
@@ -225,7 +225,7 @@ add({
     title: "Zephyr Construct Internal Camera Relay - Contract In Progress 02",
     category: "Surveillance",
     subcategory: "Zephyr Construct Camera Relay",
-    file: "zephyr-construct-internal-camera-relay-_contract-in-progress_-02.png",
+    file: "zephyr-construct-internal-camera-relay-contract-in-progress-02.png",
     order: 2,
 });
 
@@ -233,7 +233,7 @@ add({
     title: "Zephyr Construct Internal Camera Relay - Contract In Progress 03",
     category: "Surveillance",
     subcategory: "Zephyr Construct Camera Relay",
-    file: "zephyr-construct-internal-camera-relay-_contract-in-progress_-03.png",
+    file: "zephyr-construct-internal-camera-relay-contract-in-progress-03.png",
     order: 3,
 });
 
@@ -241,6 +241,6 @@ add({
     title: "Zephyr Construct Internal Camera Relay - Contract In Progress 04",
     category: "Surveillance",
     subcategory: "Zephyr Construct Camera Relay",
-    file: "zephyr-construct-internal-camera-relay-_contract-in-progress_-04.png",
+    file: "zephyr-construct-internal-camera-relay-contract-in-progress-04.png",
     order: 4,
 });
