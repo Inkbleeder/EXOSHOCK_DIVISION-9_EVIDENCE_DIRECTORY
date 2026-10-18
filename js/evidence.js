@@ -217,7 +217,7 @@ add({
     title: "Zephyr Construct Internal Camera Relay - Contract In Progress 01",
     category: "Surveillance",
     subcategory: "Zephyr Construct Camera Relay",
-    file: "zephyr-construct-internal-camera-relay-contract-in-progress-01.png",
+    file: "zephyr-construct-internal-camera-relay-(contract-in-progress)-01.png",
     order: 1,
 });
 
@@ -225,7 +225,7 @@ add({
     title: "Zephyr Construct Internal Camera Relay - Contract In Progress 02",
     category: "Surveillance",
     subcategory: "Zephyr Construct Camera Relay",
-    file: "zephyr-construct-internal-camera-relay-contract-in-progress-02.png",
+    file: "zephyr-construct-internal-camera-relay-(contract-in-progress)-02.png",
     order: 2,
 });
 
@@ -233,7 +233,7 @@ add({
     title: "Zephyr Construct Internal Camera Relay - Contract In Progress 03",
     category: "Surveillance",
     subcategory: "Zephyr Construct Camera Relay",
-    file: "zephyr-construct-internal-camera-relay-contract-in-progress-03.png",
+    file: "zephyr-construct-internal-camera-relay-(contract-in-progress)-03.png",
     order: 3,
 });
 
@@ -241,6 +241,6 @@ add({
     title: "Zephyr Construct Internal Camera Relay - Contract In Progress 04",
     category: "Surveillance",
     subcategory: "Zephyr Construct Camera Relay",
-    file: "zephyr-construct-internal-camera-relay-contract-in-progress-04.png",
+    file: "zephyr-construct-internal-camera-relay-(contract-in-progress)-04.png",
     order: 4,
 });
