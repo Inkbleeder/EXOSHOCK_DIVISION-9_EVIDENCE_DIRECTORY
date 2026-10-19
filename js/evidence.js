@@ -248,7 +248,7 @@ add({
 /* ---- batch 2: new images and GIFs ---- */
 
 add({
-    title: "Idle Environment Capture 07",
+    title: "Idle Environment Capture 07 (Loading Bay)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_07.png",
@@ -256,7 +256,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture 08",
+    title: "Idle Environment Capture 08 (Atrium/Main Ship Hub)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_08.png",
@@ -264,7 +264,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture 09",
+    title: "Idle Environment Capture 09 (Data Flow Central Processing Unit)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_09.png",
@@ -272,7 +272,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture 10",
+    title: "Idle Environment Capture 10 (Breached Airlock)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_10.png",
@@ -280,7 +280,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture 11",
+    title: "Idle Environment Capture 11 (Maintanence Gantry)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_11.png",
@@ -288,7 +288,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture 12",
+    title: "Idle Environment Capture 12 (Mess Hall)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_12.png",
@@ -296,7 +296,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture 13",
+    title: "Idle Environment Capture 13 (Upper Decks Hall)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_13.png",
@@ -315,26 +315,26 @@ add({
     title: "Mid-Contract Chest Camera - Melee Demonstration",
     category: "Surveillance",
     subcategory: "Operative Chest Camera",
-    file: "mid_contract_chest_camera_div9_operative_footage_melee_demonstration_.gif",
+    file: "mid_contract_chest_camera_div9_operative_footage(melee_demonstration)_.gif",
     order: 7,
 });
 
 add({
-    title: "Support Item Drone - Idle Capture (Squad)",
+    title: "Support Item Drone - Idle Capture [Squad]",
     category: "Surveillance",
     subcategory: "Drone Camera Feed",
-    file: "support_item_drone__idle_capture__squad_.gif",
+    file: "support_item(drone)_idle_capture_[squad]_.gif",
     order: 3,
-    related: ["Support Item Drone - Idle Capture (Squad, Status Damaged)"],
+    related: ["Support Item Drone - Idle Capture (Camera, Status Damaged)"],
 });
 
 add({
-    title: "Support Item Drone - Idle Capture (Squad, Status Damaged)",
+    title: "Support Item Drone - Idle Capture (Camera, Status Damaged)",
     category: "Surveillance",
     subcategory: "Drone Camera Feed",
-    file: "support_item_drone__idle_capture__squad___status_damaged_true_.gif",
+    file: "support_item(drone)_idle_capture_[squad]_(status_damaged_true)_.gif",
     order: 4,
-    related: ["Support Item Drone - Idle Capture (Squad)"],
+    related: ["Support Item Drone - Idle Capture [Squad]"],
 });
 
 add({
