@@ -401,7 +401,7 @@ add({
     title: "Zephyr Constructs Efficacy Field Test 02 (BSLSK Field Operative Support)",
     category: "Field Tests",
     subcategory: "Zephyr Constructs",
-    file: "zephyr_constructs_efficacy_field_test_02__bslsk_field_operative_support_.gif",
+    file: "zephyr_constructs_efficacy_field_test_02_(bslsk_field_operative_support).gif",
     order: 2,
     related: ["Zephyr Constructs Efficacy Field Test 01"],
 });
