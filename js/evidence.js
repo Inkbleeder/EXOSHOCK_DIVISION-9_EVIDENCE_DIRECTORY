@@ -55,7 +55,7 @@ const D9_CONFIG = {
     archiveName: "DIVISION 9 // EVIDENCE DIRECTORY",
     version: "1.0",
     prompt: "D9>",
-    categoryOrder: ["Surveillance", "Administration", "Personnel"]
+    categoryOrder: ["Surveillance", "Administration", "Personnel", "Armory", "Field Tests"]
 };
 
 const D9_EVIDENCE = [];
@@ -243,4 +243,165 @@ add({
     subcategory: "Zephyr Construct Camera Relay",
     file: "zephyr-construct-internal-camera-relay-(contract-in-progress)-04.png",
     order: 4,
+});
+
+/* ---- batch 2: new images and GIFs ---- */
+
+add({
+    title: "Idle Environment Capture 07",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_07.png",
+    order: 9,
+});
+
+add({
+    title: "Idle Environment Capture 08",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_08.png",
+    order: 10,
+});
+
+add({
+    title: "Idle Environment Capture 09",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_09.png",
+    order: 11,
+});
+
+add({
+    title: "Idle Environment Capture 10",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_10.png",
+    order: 12,
+});
+
+add({
+    title: "Idle Environment Capture 11",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_11.png",
+    order: 13,
+});
+
+add({
+    title: "Idle Environment Capture 12",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_12.png",
+    order: 14,
+});
+
+add({
+    title: "Idle Environment Capture 13",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_13.png",
+    order: 15,
+});
+
+add({
+    title: "Mid-Contract Chest Camera - Active Combat Detected 06",
+    category: "Surveillance",
+    subcategory: "Operative Chest Camera",
+    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected__06.png",
+    order: 6,
+});
+
+add({
+    title: "Mid-Contract Chest Camera - Melee Demonstration",
+    category: "Surveillance",
+    subcategory: "Operative Chest Camera",
+    file: "mid_contract_chest_camera_div9_operative_footage_melee_demonstration_.gif",
+    order: 7,
+});
+
+add({
+    title: "Support Item Drone - Idle Capture (Squad)",
+    category: "Surveillance",
+    subcategory: "Drone Camera Feed",
+    file: "support_item_drone__idle_capture__squad_.gif",
+    order: 3,
+    related: ["Support Item Drone - Idle Capture (Squad, Status Damaged)"],
+});
+
+add({
+    title: "Support Item Drone - Idle Capture (Squad, Status Damaged)",
+    category: "Surveillance",
+    subcategory: "Drone Camera Feed",
+    file: "support_item_drone__idle_capture__squad___status_damaged_true_.gif",
+    order: 4,
+    related: ["Support Item Drone - Idle Capture (Squad)"],
+});
+
+add({
+    title: "Basic Hostile Engagment and Armor Demonstration",
+    category: "Personnel",
+    subcategory: "Operative",
+    file: "basic_hostile_engagment_and_armor_demonstration.gif",
+    order: 3,
+    related: ["BSLSK-Div9-Operative-Armor-Map"],
+});
+
+add({
+    title: "Wraith P60 - Heat Map",
+    category: "Armory",
+    subcategory: "Wraith P60",
+    file: "wraith_p60_heat_map.png",
+    order: 1,
+});
+
+add({
+    title: "Verdict Railgun - Standard Issue Disassembly Instructions",
+    category: "Armory",
+    subcategory: "Verdict Railgun",
+    file: "verdict_railgun_standard_issue_disassembly_instructions.png",
+    order: 1,
+    related: ["Verdict Railgun - Basic Use Demonstration"],
+});
+
+add({
+    title: "Verdict Railgun - Basic Use Demonstration",
+    category: "Armory",
+    subcategory: "Verdict Railgun",
+    file: "verdict_railgun_basic_use_demonstration.gif",
+    order: 2,
+    related: ["Verdict Railgun - Standard Issue Disassembly Instructions"],
+});
+
+add({
+    title: "Synapse 00 - Basic Use Demonstration",
+    category: "Armory",
+    subcategory: "Synapse 00",
+    file: "synapse_00_basic_use_demonstration.gif",
+    order: 1,
+});
+
+add({
+    title: "Mantis LMG - Basic Use Demonstration",
+    category: "Armory",
+    subcategory: "Mantis LMG",
+    file: "mantis_lmg_basic_use_demonstration.gif",
+    order: 1,
+});
+
+add({
+    title: "Zephyr Constructs Efficacy Field Test 01",
+    category: "Field Tests",
+    subcategory: "Zephyr Constructs",
+    file: "zephyr_constructs_efficacy_field_test_01.gif",
+    order: 1,
+    related: ["Zephyr Constructs Efficacy Field Test 02 (BSLSK Field Operative Support)"],
+});
+
+add({
+    title: "Zephyr Constructs Efficacy Field Test 02 (BSLSK Field Operative Support)",
+    category: "Field Tests",
+    subcategory: "Zephyr Constructs",
+    file: "zephyr_constructs_efficacy_field_test_02__bslsk_field_operative_support_.gif",
+    order: 2,
+    related: ["Zephyr Constructs Efficacy Field Test 01"],
 });
