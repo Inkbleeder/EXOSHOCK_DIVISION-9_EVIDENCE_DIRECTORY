@@ -315,7 +315,7 @@ add({
     title: "Mid-Contract Chest Camera - Melee Demonstration",
     category: "Surveillance",
     subcategory: "Operative Chest Camera",
-    file: "mid_contract_chest_camera_div9_operative_footage(melee_demonstration)_.gif",
+    file: "mid_contract_chest_camera_div9_operative_footage(melee_demonstration).gif",
     order: 7,
 });
 
@@ -323,7 +323,7 @@ add({
     title: "Support Item Drone - Idle Capture [Squad]",
     category: "Surveillance",
     subcategory: "Drone Camera Feed",
-    file: "support_item(drone)_idle_capture_[squad]_.gif",
+    file: "support_item(drone)_idle_capture_[squad].gif",
     order: 3,
     related: ["Support Item Drone - Idle Capture (Camera, Status Damaged)"],
 });
@@ -332,7 +332,7 @@ add({
     title: "Support Item Drone - Idle Capture (Camera, Status Damaged)",
     category: "Surveillance",
     subcategory: "Drone Camera Feed",
-    file: "support_item(drone)_idle_capture_[squad]_(status_damaged_true)_.gif",
+    file: "support_item(drone)_idle_capture_[squad]_(status_damaged_true).gif",
     order: 4,
     related: ["Support Item Drone - Idle Capture [Squad]"],
 });
