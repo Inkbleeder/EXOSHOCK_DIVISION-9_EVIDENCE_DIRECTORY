@@ -405,3 +405,53 @@ add({
     order: 2,
     related: ["Zephyr Constructs Efficacy Field Test 01"],
 });
+
+/* ---- batch 3: idle environment captures 14-19 ---- */
+
+add({
+    title: "Idle Environment Capture 14",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_14.png",
+    order: 16,
+});
+
+add({
+    title: "Idle Environment Capture 15",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_15.png",
+    order: 17,
+});
+
+add({
+    title: "Idle Environment Capture 16",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_16.png",
+    order: 18,
+});
+
+add({
+    title: "Idle Environment Capture 17",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_17.png",
+    order: 19,
+});
+
+add({
+    title: "Idle Environment Capture 18",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_18.png",
+    order: 20,
+});
+
+add({
+    title: "Idle Environment Capture 19",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_19.png",
+    order: 21,
+});
