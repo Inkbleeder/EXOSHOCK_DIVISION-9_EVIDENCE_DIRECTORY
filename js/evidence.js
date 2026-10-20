@@ -449,7 +449,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture 19 (Revive Pop)",
+    title: "Idle Environment Capture 19 (Revive Pod)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_19.png",
