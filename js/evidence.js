@@ -102,7 +102,7 @@ add({
 });
 
 add({
-    title: "Idle Environment Capture 06 (Unknown Liquid Containers)",
+    title: "Idle Environment Capture 06 (Onboard Labratory | Purpose Unknown)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_06.png",
@@ -146,7 +146,7 @@ add({
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture(combat-detected)_01.png",
-    order: 7,
+    order: 21,
 });
 
 add({
@@ -154,7 +154,7 @@ add({
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture(combat-detected)_02.png",
-    order: 8,
+    order: 20,
 });
 
 add({
@@ -252,7 +252,7 @@ add({
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_07.png",
-    order: 9,
+    order: 7,
 });
 
 add({
@@ -260,7 +260,7 @@ add({
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_08.png",
-    order: 10,
+    order: 8,
 });
 
 add({
@@ -268,7 +268,7 @@ add({
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_09.png",
-    order: 11,
+    order: 9,
 });
 
 add({
@@ -276,7 +276,7 @@ add({
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_10.png",
-    order: 12,
+    order: 10,
 });
 
 add({
@@ -284,7 +284,7 @@ add({
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_11.png",
-    order: 13,
+    order: 11,
 });
 
 add({
@@ -292,7 +292,7 @@ add({
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_12.png",
-    order: 14,
+    order: 12,
 });
 
 add({
@@ -300,7 +300,7 @@ add({
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_13.png",
-    order: 15,
+    order: 13,
 });
 
 add({
@@ -409,49 +409,49 @@ add({
 /* ---- batch 3: idle environment captures 14-19 ---- */
 
 add({
-    title: "Idle Environment Capture 14",
+    title: "Idle Environment Capture 14 (Main Onboard CPU)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_14.png",
+    order: 14,
+});
+
+add({
+    title: "Idle Environment Capture 15 (Cargo Bay)",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_15.png",
+    order: 15,
+});
+
+add({
+    title: "Idle Environment Capture 16 (Engineering)",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "idle_environment_capture_16.png",
     order: 16,
 });
 
 add({
-    title: "Idle Environment Capture 15",
+    title: "Idle Environment Capture 17 (Life Support)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
-    file: "idle_environment_capture_15.png",
+    file: "idle_environment_capture_17.png",
     order: 17,
 });
 
 add({
-    title: "Idle Environment Capture 16",
+    title: "Idle Environment Capture 18 (Primary Strategic Command Bridge)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
-    file: "idle_environment_capture_16.png",
+    file: "idle_environment_capture_18.png",
     order: 18,
 });
 
 add({
-    title: "Idle Environment Capture 17",
-    category: "Surveillance",
-    subcategory: "Idle Enviroment",
-    file: "idle_environment_capture_17.png",
-    order: 19,
-});
-
-add({
-    title: "Idle Environment Capture 18",
-    category: "Surveillance",
-    subcategory: "Idle Enviroment",
-    file: "idle_environment_capture_18.png",
-    order: 20,
-});
-
-add({
-    title: "Idle Environment Capture 19",
+    title: "Idle Environment Capture 19 (Revive Pop)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
     file: "idle_environment_capture_19.png",
-    order: 21,
+    order: 19,
 });
