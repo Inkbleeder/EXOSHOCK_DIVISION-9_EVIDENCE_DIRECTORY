@@ -22,10 +22,11 @@
      it is a bare line: late contracts need a near-perfect bearing.
    - Fuel: clean fix = breach; near = vessel corrects course (costs more); miss =
      vessel recalled. Credits are earned per breach and grow with every contract.
-     Every 5th contract a small supply ship flies in from a corner of the sector
-     and docks with the boarding vessel. Two buttons on the radar let you take the
-     fuel (the listed credits are deducted, and the price rises with difficulty)
-     or turn it down. No fuel = shift over.
+     After every 5th contract the NEXT round opens with a supply ship: it flies in
+     from a random corner of the sector and docks with the boarding vessel while
+     that is still at its dock on the sector edge. Two buttons on the radar let you
+     take the fuel (the listed credits are deducted, and the price rises with
+     difficulty) or turn it down; then the contract starts. No fuel = shift over.
 
    CONTROLS (mouse, keyboard and typed - the terminal stays usable)
      dial: drag the knob, or buttons, or ArrowLeft / ArrowRight (Shift = x5)
@@ -61,7 +62,7 @@ const Triangulate = (() => {
   const CREDIT_GROWTH = 0.12;                 /* +12% credits per contract past the first */
   const DEPOT_GROWTH = 0.18;                  /* +18% resupply price per contract past the first */
   const SUPPLY_SPEED = 30;                    /* km per second, supply ship */
-  const DOCK_GAP = 5;                         /* km: the supply ship parks this far inside the D9 dock */
+  const DOCK_GAP = 7;                         /* km: the supply ship parks this far from the boarding vessel at the dock */
   const VESSEL_SPEED = 34;                    /* km per second */
   const BRIEF_S = 1.7;
   const RESULT_S = 4.2;
@@ -616,7 +617,7 @@ const Triangulate = (() => {
         <p><b>1. LISTEN.</b> Pick a node. Turn its dial. The meter and tone rise as you near the ship. Lock the bearing at the peak. Each lock draws a cone: wide on early contracts, narrower every contract, and a bare line at the end. Late contracts need a near-perfect bearing.</p>
         <p><b>2. CROSS.</b> Lock at least two nodes (three is better). Click the radar where the cones meet to pin your estimate. The pin reads back a signal strength: the ship is at the peak, and the reading is steadier the closer you are. Right-click, UNPIN or Delete to lift it and try again.</p>
         <p><b>3. TRANSMIT.</b> The boarding vessel launches from a different point on the sector edge each contract and flies to your pin. If the ship is there, it docks and breaches. Near misses cost extra fuel. A miss is recalled.</p>
-        <p><b>FUEL</b> is the main limit. Clean fix: no net cost. Near: 10. Miss: 35. At zero the shift ends. <b>CREDITS</b> are earned per breach, and pay more the deeper into the shift you are. Every 5th contract a supply ship flies in and docks with the boarding vessel. Press RESUPPLY to buy ${DEPOT_FUEL} fuel (the price is deducted in full, ${DEPOT_COST} credits at first and more every contract) or DECLINE to send it away.</p>
+        <p><b>FUEL</b> is the main limit. Clean fix: no net cost. Near: 10. Miss: 35. At zero the shift ends. <b>CREDITS</b> are earned per breach, and pay more the deeper into the shift you are. After every 5th contract the next round opens with a supply ship flying in from a corner to meet the boarding vessel at the dock on the sector edge. Press RESUPPLY to buy ${DEPOT_FUEL} fuel (the price is deducted in full, ${DEPOT_COST} credits at first and more every contract) or DECLINE to send it away. The search starts afterwards.</p>
         <p class="legend"><span class="lg tri-sym" style="color:#ffb347">&#9650;</span> NODE &nbsp; <span class="lg sq">&#9632;</span> SHIP (once found) &nbsp; <span class="lg ci">&#9679;</span> BOARDING VESSEL &nbsp; <span class="lg" style="color:#fff">+</span> YOUR ESTIMATE</p>
         <p class="keys"><b>KEYS</b> ArrowLeft / ArrowRight turn the dial (Shift = x5) &middot; Space locks &middot; 1 2 3 pick a node &middot; Delete unpins &middot; only while the terminal line is empty.<br><b>TYPED</b> bearing 045 &middot; node 2 &middot; lock &middot; reset &middot; mark 42 63 &middot; unpin &middot; transmit &middot; resupply &middot; decline &middot; skip &middot; quit</p>
       </div>
@@ -665,18 +666,22 @@ const Triangulate = (() => {
   }
 
   /* ---- supply ship: an offer on the radar, not a menu ----
-     A small ship comes in from a random corner and docks with the D9 boarding
-     vessel. Two big buttons appear over the radar: RESUPPLY or DECLINE. */
+     At the start of the round after every 5th contract a small ship comes in from
+     a random corner and docks with the D9 boarding vessel at its dock on the map
+     border. Two big buttons appear over the radar: RESUPPLY or DECLINE. */
 
   function startDepot() {
-    const s = G.shift;
-    const corner = CORNERS[Math.floor(Math.random() * CORNERS.length)];
-    /* the boarding vessel stays where the contract left it; the supply ship
-       comes in from its corner and stops just short of it, side by side */
-    const v = G.flight || G.contract.dock;
+    const s = G.shift, v = G.contract.dock;
+    /* the boarding vessel is still at its dock on the sector edge; the supply
+       ship comes from a random corner (not one right next to the dock) and
+       stops just short of the vessel, side by side */
+    const far = CORNERS.filter(k => dist(k, v) >= 40);
+    const pool = far.length ? far : CORNERS;
+    const corner = pool[Math.floor(Math.random() * pool.length)];
     const dx = corner.x - v.x, dy = corner.y - v.y, dl = Math.hypot(dx, dy) || 1;
     const park = { x: v.x + dx / dl * DOCK_GAP, y: v.y + dy / dl * DOCK_GAP };
     G.state = "DEPOT";
+    G.flight = null;
     G.depot = {
       phase: "in", corner, park, x: corner.x, y: corner.y, t: 0, next: "next",
       cost: depotCostFor(s.contracts),
@@ -756,7 +761,7 @@ const Triangulate = (() => {
         Sfx.loopStop("vessel_travel_loop");
         const next = d.next;
         G.depot = null;
-        if (next === "over") showOver(); else nextContract();
+        if (next === "over") showOver(); else introContract();
       }
     }
   }
@@ -767,6 +772,7 @@ const Triangulate = (() => {
     G.shift = newShift();
     G.contract = null;
     G.depot = null;
+    G.depotPending = false;
     hideOffer();
     hideScreen();
     Sfx.play("shift_start");
@@ -778,13 +784,20 @@ const Triangulate = (() => {
     const n = G.shift.contracts + 1;
     G.contract = makeContract(n);
     G.active = 0;
-    G.state = "BRIEF";
-    G.timer = BRIEF_S;
     G.flight = null;
     G.depot = null;
     hideOffer();
     hideScreen();
     Sfx.loopStop("vessel_travel_loop");
+    /* a supply visit is due: it happens first, with the vessel still at the dock */
+    if (G.depotPending) { G.depotPending = false; startDepot(); updateSide(); renderHUD(); return; }
+    introContract();
+  }
+
+  /* the round proper: brief, then the search */
+  function introContract() {
+    G.state = "BRIEF";
+    G.timer = BRIEF_S;
     Sfx.play("contract_assigned");
     toast(`<div class="t-head">CONTRACT ASSIGNED</div><div class="t-big">${G.contract.id}</div>
            <div class="t-sub">PRIORITY: ${G.contract.priority}</div><div class="t-sub">ONE VESSEL, HIDING. LOCATE AND TRANSMIT.</div>`);
@@ -997,7 +1010,7 @@ const Triangulate = (() => {
     const fuelNet = f.outcome === "clean" ? 0 : f.outcome === "near" ? -(FUEL_COST.near - RESUPPLY) : -FUEL_COST.miss;
     toast(`<div class="t-head">${head}</div>${lines.map(l => `<div class="t-line">${l}</div>`).join("")}
            <div class="t-stats"><span>${pts ? "+" + fmtN(pts) + " VALUE" + (mult > 1 && f.outcome === "clean" ? " (x" + mult.toFixed(1) + ")" : "") : "NO VALUE"}</span><span>${cr ? "+" + cr + " CR" : "NO CREDITS"}</span><span>FUEL ${fuelNet >= 0 ? "+" : ""}${fuelNet}</span></div>
-           <div class="t-sub">${depotDue() ? "SUPPLY SHIP: " + (s.credits >= depotCostFor(s.contracts) ? "INBOUND NEXT (" + fmtN(depotCostFor(s.contracts)) + " CR)." : "NOT DISPATCHED (NEED " + fmtN(depotCostFor(s.contracts)) + " CR).") : ""}</div>
+           <div class="t-sub">${depotDue() ? "SUPPLY SHIP " + (s.credits >= depotCostFor(s.contracts) ? "MEETS THE VESSEL AT THE DOCK NEXT ROUND (" + fmtN(depotCostFor(s.contracts)) + " CR)." : "NOT DISPATCHED (NEED " + fmtN(depotCostFor(s.contracts)) + " CR).") : ""}</div>
            <div class="t-sub">${s.fuel > 0 || depotDue() ? "NEXT CONTRACT SHORTLY. (CLICK OR TYPE skip)" : ""}</div>`);
     updateSide();
   }
@@ -1007,8 +1020,8 @@ const Triangulate = (() => {
   function afterResult() {
     hideToast();
     const s = G.shift;
-    if (depotDue() && s.credits >= depotCostFor(s.contracts)) startDepot();
-    else if (s.fuel <= 0) showOver();
+    G.depotPending = depotDue() && s.credits >= depotCostFor(s.contracts);
+    if (s.fuel <= 0 && !G.depotPending) showOver();
     else nextContract();
   }
 
@@ -1215,8 +1228,9 @@ const Triangulate = (() => {
       }
 
       /* boarding vessel: green circle */
-      if (G.flight) {
-        const p = WORLD(G.flight), x = Math.round(p.x), y = Math.round(p.y);
+      const vessel = G.flight || (G.depot ? c.dock : null);
+      if (vessel) {
+        const p = WORLD(vessel), x = Math.round(p.x), y = Math.round(p.y);
         ctx.fillStyle = ink;
         ctx.beginPath(); ctx.arc(x, y, 3.6, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = withAlpha(ink, 0.5);
@@ -1224,7 +1238,7 @@ const Triangulate = (() => {
       }
     }
 
-    /* supply ship: a small yellow diamond that flies in from a corner and docks with the vessel */
+    /* supply ship: drawn like the boarding vessel (circle + ring), in yellow; flies in from a corner and docks with it at the dock */
     if (G.depot) {
       const sp = G.depot, p = WORLD(sp), x = Math.round(p.x), y = Math.round(p.y), cp = WORLD(sp.corner);
       ctx.setLineDash([2, 4]);
@@ -1232,9 +1246,9 @@ const Triangulate = (() => {
       ctx.beginPath(); ctx.moveTo(cp.x, cp.y); ctx.lineTo(p.x, p.y); ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = "#ffe066";
-      ctx.beginPath(); ctx.moveTo(x, y - 5); ctx.lineTo(x + 5, y); ctx.lineTo(x, y + 5); ctx.lineTo(x - 5, y); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, 3.6, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = withAlpha("#ffe066", 0.5);
-      ctx.strokeRect(x - 8.5, y - 8.5, 17, 17);
+      ctx.beginPath(); ctx.arc(x, y, 6.5, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = withAlpha("#ffe066", 0.85);
       ctx.fillText("SUP", clamp(x + 11, 2, RES - 22), clamp(y - 4, 2, RES - 10));
     }
