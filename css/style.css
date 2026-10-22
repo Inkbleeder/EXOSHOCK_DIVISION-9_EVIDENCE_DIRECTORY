@@ -1769,3 +1769,6 @@ html, body, * {
 }
 /* the location line stays visible in the pillar even on phones */
 @media (max-width:640px){ #terminal-output .ev-row .r-loc{ display:block; } }
+
+/* a disabled big button (tank already full) stays readable */
+.tri-b.big:disabled{ opacity:.5; }
