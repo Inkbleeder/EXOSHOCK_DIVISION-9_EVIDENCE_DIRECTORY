@@ -152,6 +152,18 @@ const Term = (() => {
     return printNode(box);
   }
 
+  /* aligned key / meaning list for hints (pillar-only look, see style.css) */
+  function printKeys(pairs) {
+    const d = mk("div", "kv");
+    pairs.forEach(p => { d.appendChild(mk("b", "", p[0])); d.appendChild(mk("span", "", p[1])); });
+    const line = mk("div", "line");
+    line.appendChild(d);
+    line.style.display = "none";
+    out.appendChild(line);
+    enqueue({ el: line });
+    return line;
+  }
+
   /* wraps every match of `words` in <span class="hl"> (text is escaped) */
   function hlHTML(text, words) {
     text = String(text);
@@ -197,7 +209,7 @@ const Term = (() => {
   }
 
   function finishResults() {
-    print("TYPE A RECORD NAME TO OPEN IT, OR USE \u2191 \u2193 + ENTER ON AN EMPTY LINE. (CLICKING A ROW WORKS TOO.)", "dim");
+    printKeys([["\u2191 \u2193", "select a result"], ["ENTER", "open it (empty line)"], ["CLICK", "open a row"], ["NAME", "type a title to open"]]);
     Sound.play("success");
     resultsActive = true;
     selectResult(0, true);
@@ -241,7 +253,7 @@ const Term = (() => {
     hits.forEach(h => {
       const ev = h.entry;
       const row = makeRow(ev, [term], 0, panel);
-      row.insertBefore(mk("span", "r-loc", "[" + Archive.location(ev).toUpperCase() + "]"), row.children[1]);
+      row.insertBefore(mk("span", "r-loc", Archive.location(ev).toUpperCase().replace(" / ", " \u203a ")), row.children[1]);
       if (h.snippet) {
         const sn = mk("div", "ev-snip");
         sn.innerHTML = "\"" + hlHTML(h.snippet, [term]) + "\"";
@@ -515,11 +527,11 @@ const Term = (() => {
     if (f.ambiguous) {
       print("MULTIPLE ENTRIES FOUND: \"" + q + "\"", "warning");
       f.matches.forEach(e => print("[" + Archive.location(e).toUpperCase() + "]"));
-      print("Type 'open <category/subcategory> " + q + "' to specify - see location(s) above.", "dim");
+      print("Use  open <category> " + q + "  to choose one.", "dim");
       return null;
     }
     if (f.matches.length > 1) {
-      print("MULTIPLE RECORDS MATCH. BE MORE SPECIFIC:", "warning");
+      print("MULTIPLE RECORDS MATCH \u2014 BE MORE SPECIFIC", "warning");
       showResults(f.matches, "MATCHING \"" + q.toUpperCase() + "\"", [q], { flat: true });
       return null;
     }
@@ -538,7 +550,7 @@ const Term = (() => {
         return;
       }
       Sound.play("success");
-      print("APPROVED COMMANDS:", "success");
+      print("APPROVED COMMANDS", "head");
       printBox("SEARCH <term>", "search titles and file contents. Results appear here; the index stays put");
       printBox("OPEN <name>", "open a record in a viewer window. Clicking it in the index works too, and so does typing just the name. Use \"open <category> <name>\" if two records share a title");
       printBox("NEXT / PREV", "open the next or previous record");
@@ -546,7 +558,7 @@ const Term = (() => {
       printBox("MUTE / UNMUTE", "silence or restore all sound");
       printBox("CLEAR", "clear the screen");
       printBox("REBOOT", "replay the boot sequence");
-      print("Tab completes (press again to cycle) \u00b7 \u2191 \u2193 recalls previous commands \u00b7 ESC closes the front window", "system");
+      printKeys([["TAB", "complete a name (again to cycle)"], ["\u2191 \u2193", "recall earlier commands"], ["ESC", "close the front window"]]);
     },
     ["MAN", "?"]);
 
@@ -631,7 +643,7 @@ const Term = (() => {
   }
 
   return {
-    print, printHTML, printNode, printBox, echo, clear, execute, init, refocus,
+    print, printHTML, printNode, printBox, printKeys, echo, clear, execute, init, refocus,
     renderIndex, clearIndex,
     resetResults, progress, whenIdle, skipTyping,
     get resultsActive() { return resultsActive; }
