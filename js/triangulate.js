@@ -701,15 +701,18 @@ const Triangulate = (() => {
     const d = G.depot, s = G.shift;
     const afford = s.credits >= d.cost, useful = d.gain > 0;
     hideToast();
-    say("dispatch_docked", "Supply ship docked. Resupply or decline.", "DISPATCH");
+    const fuelNow = Math.max(0, Math.round(s.fuel));
+    say("dispatch_docked", useful ? "Supply ship docked. Resupply or decline." : "Supply ship docked. Fuel reserve is full, nothing to load.", "DISPATCH");
     /* keep the panel off the ships: top of the radar when they sit in the lower half */
     G.R.offer.classList.toggle("top", d.y > 50);
     G.R.offer.innerHTML =
       `<div class="o-head">SUPPLY SHIP DOCKED</div>
-       <div class="o-sub">+${d.gain} FUEL FOR ${fmtN(d.cost)} CREDITS &middot; YOU HAVE ${fmtN(s.credits)}</div>
+       <div class="o-sub">${useful
+          ? "+" + d.gain + " FUEL (" + fuelNow + " &rarr; " + (fuelNow + d.gain) + ") FOR " + fmtN(d.cost) + " CREDITS &middot; YOU HAVE " + fmtN(s.credits)
+          : "FUEL RESERVE FULL (" + fuelNow + " / " + START_FUEL + ") &middot; NOTHING TO LOAD"}</div>
        <div class="o-btns">
-         <button class="tri-b go big" data-a="resupply"${afford && useful ? "" : " disabled"}>RESUPPLY<small>-${fmtN(d.cost)} CR</small></button>
-         <button class="tri-b alt big" data-a="decline">DECLINE<small>NO CHARGE</small></button>
+         <button class="tri-b go big" data-a="resupply"${afford && useful ? "" : " disabled"}${useful ? "" : ' title="Fuel reserve is already full"'}>${useful ? "RESUPPLY<small>-" + fmtN(d.cost) + " CR</small>" : "TANK FULL<small>NOTHING TO LOAD</small>"}</button>
+         <button class="tri-b alt big" data-a="decline">${useful ? "DECLINE" : "SEND AWAY"}<small>NO CHARGE</small></button>
        </div>`;
     G.R.offer.classList.add("on");
   }
