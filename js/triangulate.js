@@ -21,8 +21,11 @@
    - The cone (wedge) is wide in early contracts and narrows every contract until
      it is a bare line: late contracts need a near-perfect bearing.
    - Fuel: clean fix = breach; near = vessel corrects course (costs more); miss =
-     vessel recalled. Credits are earned per breach. Every 5th contract a supply
-     depot offers fuel for credits. No fuel = shift over.
+     vessel recalled. Credits are earned per breach and grow with every contract.
+     Every 5th contract a small supply ship flies in from a corner of the sector
+     and docks with the boarding vessel. Two buttons on the radar let you take the
+     fuel (the listed credits are deducted, and the price rises with difficulty)
+     or turn it down. No fuel = shift over.
 
    CONTROLS (mouse, keyboard and typed - the terminal stays usable)
      dial: drag the knob, or buttons, or ArrowLeft / ArrowRight (Shift = x5)
@@ -54,7 +57,11 @@ const Triangulate = (() => {
   const CONE_START = 24;                      /* wedge half-angle (deg) on contract 1 */
   const TOL_START = 7.0, TOL_END = 1.2;       /* clean-fix radius (km), first -> last */
   const CREDIT_CLEAN = 140, CREDIT_STREAK = 15, CREDIT_NEAR = 60;
-  const DEPOT_EVERY = 5, DEPOT_COST = 300, DEPOT_FUEL = 50;
+  const DEPOT_EVERY = 5, DEPOT_COST = 300, DEPOT_FUEL = 50;   /* DEPOT_COST = price on contract 1 */
+  const CREDIT_GROWTH = 0.12;                 /* +12% credits per contract past the first */
+  const DEPOT_GROWTH = 0.18;                  /* +18% resupply price per contract past the first */
+  const SUPPLY_SPEED = 30;                    /* km per second, supply ship */
+  const DOCK_GAP = 5;                         /* km: the supply ship parks this far inside the D9 dock */
   const VESSEL_SPEED = 34;                    /* km per second */
   const BRIEF_S = 1.7;
   const RESULT_S = 4.2;
@@ -83,6 +90,10 @@ const Triangulate = (() => {
   const coneFor = n => n >= FINAL_CONTRACT ? 0 : CONE_START * Math.pow(1 - ramp(n), 1.4);
   const tolClean = n => TOL_START + (TOL_END - TOL_START) * ramp(n);
   const tolNear = n => tolClean(n) * 2.2;
+  /* credits and the resupply price both climb with the contract number (the price faster) */
+  const creditScale = n => 1 + CREDIT_GROWTH * Math.max(0, n - 1);
+  const depotCostFor = n => Math.round(DEPOT_COST * (1 + DEPOT_GROWTH * Math.max(0, n - 1)) / 10) * 10;
+  const CORNERS = [{ x: 3, y: 3 }, { x: 97, y: 3 }, { x: 3, y: 97 }, { x: 97, y: 97 }];
   /* the boarding vessel launches from a random point on the sector's edge */
   function edgeDock() {
     const side = Math.floor(Math.random() * 4), k = rnd(8, 92), e = 4;
@@ -441,6 +452,7 @@ const Triangulate = (() => {
         <div class="tri-radar-wrap">
           <canvas class="tri-radar" data-r="radar" width="${RES}" height="${RES}"></canvas>
           <div class="tri-toast" data-r="toast"></div>
+          <div class="tri-offer" data-r="offer"></div>
         </div>
         <div class="tri-readout"><span data-r="cursor">CURSOR --- / ---</span><span data-r="marker">PIN --- / ---</span></div>
       </div>
@@ -554,6 +566,15 @@ const Triangulate = (() => {
   }
   function hideScreen() { G.R.screen.className = "tri-screen"; G.R.screen.innerHTML = ""; }
 
+  /* quick press animation for buttons driven from the keyboard or the terminal
+     (same trick as the EXOFM keys); mouse presses use :active in style.css */
+  function tap(name) {
+    const b = G && G.root.querySelector('[data-a="' + name + '"]');
+    if (!b) return;
+    b.classList.add("tap");
+    setTimeout(() => b.classList.remove("tap"), 160);
+  }
+
   function toast(html, secs) {
     G.R.toast.innerHTML = html;
     G.R.toast.classList.add("on");
@@ -595,7 +616,7 @@ const Triangulate = (() => {
         <p><b>1. LISTEN.</b> Pick a node. Turn its dial. The meter and tone rise as you near the ship. Lock the bearing at the peak. Each lock draws a cone: wide on early contracts, narrower every contract, and a bare line at the end. Late contracts need a near-perfect bearing.</p>
         <p><b>2. CROSS.</b> Lock at least two nodes (three is better). Click the radar where the cones meet to pin your estimate. The pin reads back a signal strength: the ship is at the peak, and the reading is steadier the closer you are. Right-click, UNPIN or Delete to lift it and try again.</p>
         <p><b>3. TRANSMIT.</b> The boarding vessel launches from a different point on the sector edge each contract and flies to your pin. If the ship is there, it docks and breaches. Near misses cost extra fuel. A miss is recalled.</p>
-        <p><b>FUEL</b> is the main limit. Clean fix: no net cost. Near: 10. Miss: 35. At zero the shift ends. <b>CREDITS</b> are earned per breach. Every 5th contract the supply depot sells fuel (${DEPOT_FUEL} units for ${DEPOT_COST} credits).</p>
+        <p><b>FUEL</b> is the main limit. Clean fix: no net cost. Near: 10. Miss: 35. At zero the shift ends. <b>CREDITS</b> are earned per breach, and pay more the deeper into the shift you are. Every 5th contract a supply ship flies in and docks with the boarding vessel. Press RESUPPLY to buy ${DEPOT_FUEL} fuel (the price is deducted in full, ${DEPOT_COST} credits at first and more every contract) or DECLINE to send it away.</p>
         <p class="legend"><span class="lg tri-sym" style="color:#ffb347">&#9650;</span> NODE &nbsp; <span class="lg sq">&#9632;</span> SHIP (once found) &nbsp; <span class="lg ci">&#9679;</span> BOARDING VESSEL &nbsp; <span class="lg" style="color:#fff">+</span> YOUR ESTIMATE</p>
         <p class="keys"><b>KEYS</b> ArrowLeft / ArrowRight turn the dial (Shift = x5) &middot; Space locks &middot; 1 2 3 pick a node &middot; Delete unpins &middot; only while the terminal line is empty.<br><b>TYPED</b> bearing 045 &middot; node 2 &middot; lock &middot; reset &middot; mark 42 63 &middot; unpin &middot; transmit &middot; resupply &middot; decline &middot; skip &middot; quit</p>
       </div>
@@ -643,46 +664,101 @@ const Triangulate = (() => {
       <div class="scr-btns"><button class="tri-b go" data-a="start">NEXT SHIFT</button><button class="tri-b alt" data-a="quit">CLOCK OUT</button></div>`, "over");
   }
 
-  function showDepot() {
+  /* ---- supply ship: an offer on the radar, not a menu ----
+     A small ship comes in from a random corner and docks with the D9 boarding
+     vessel. Two big buttons appear over the radar: RESUPPLY or DECLINE. */
+
+  function startDepot() {
+    const s = G.shift;
+    const corner = CORNERS[Math.floor(Math.random() * CORNERS.length)];
+    /* the boarding vessel stays where the contract left it; the supply ship
+       comes in from its corner and stops just short of it, side by side */
+    const v = G.flight || G.contract.dock;
+    const dx = corner.x - v.x, dy = corner.y - v.y, dl = Math.hypot(dx, dy) || 1;
+    const park = { x: v.x + dx / dl * DOCK_GAP, y: v.y + dy / dl * DOCK_GAP };
     G.state = "DEPOT";
+    G.depot = {
+      phase: "in", corner, park, x: corner.x, y: corner.y, t: 0, next: "next",
+      cost: depotCostFor(s.contracts),
+      gain: Math.min(DEPOT_FUEL, START_FUEL - Math.max(0, s.fuel))
+    };
     hideToast();
+    hideOffer();
     Sfx.loopStop("signal_tone_loop"); Sfx.loopStop("static_loop"); Sfx.loopStop("fuel_warning_loop");
-    Sfx.play("depot_open");
-    const s = G.shift, gain = Math.min(DEPOT_FUEL, START_FUEL - Math.max(0, s.fuel));
-    screen(`
-      <div class="scr-head">SUPPLY DEPOT</div>
-      <div class="scr-title">RESUPPLY AVAILABLE</div>
-      <div class="scr-sub">${s.contracts} CONTRACTS ON FILE. FUEL FOR CREDITS.</div>
-      <div class="scr-list">
-        <div><span>FUEL RESERVE</span><b>${Math.max(0, Math.round(s.fuel))} / ${START_FUEL}</b></div>
-        <div><span>CREDITS</span><b>${fmtN(s.credits)}</b></div>
-        <div><span>OFFER</span><b>+${gain} FUEL</b></div>
-        <div><span>COST</span><b>${fmtN(DEPOT_COST)} CREDITS</b></div>
-      </div>
-      <div class="scr-btns">
-        <button class="tri-b go" data-a="resupply">RESUPPLY</button>
-        <button class="tri-b alt" data-a="decline">DECLINE</button>
-      </div>
-      <div class="scr-foot">Type  resupply  or  decline.  The depot opens every ${DEPOT_EVERY}th contract.</div>`);
+    Sfx.play("vessel_launch");
+    Sfx.loopStart("vessel_travel_loop");
+    say("dispatch_on_approach", "Supply ship inbound. Docking with the boarding vessel.", "DISPATCH");
     renderHUD();
+    updateSide();
   }
 
+  function showOffer() {
+    const d = G.depot, s = G.shift;
+    const afford = s.credits >= d.cost, useful = d.gain > 0;
+    hideToast();
+    say("dispatch_docked", "Supply ship docked. Resupply or decline.", "DISPATCH");
+    /* keep the panel off the ships: top of the radar when they sit in the lower half */
+    G.R.offer.classList.toggle("top", d.y > 50);
+    G.R.offer.innerHTML =
+      `<div class="o-head">SUPPLY SHIP DOCKED</div>
+       <div class="o-sub">+${d.gain} FUEL FOR ${fmtN(d.cost)} CREDITS &middot; YOU HAVE ${fmtN(s.credits)}</div>
+       <div class="o-btns">
+         <button class="tri-b go big" data-a="resupply"${afford && useful ? "" : " disabled"}>RESUPPLY<small>-${fmtN(d.cost)} CR</small></button>
+         <button class="tri-b alt big" data-a="decline">DECLINE<small>NO CHARGE</small></button>
+       </div>`;
+    G.R.offer.classList.add("on");
+  }
+  function hideOffer() { if (G) { G.R.offer.classList.remove("on"); G.R.offer.innerHTML = ""; } }
+
+  function depotReady() { return !!(G && G.state === "DEPOT" && G.depot && G.depot.phase === "docked"); }
+
   function resupply() {
-    if (!G || G.state !== "DEPOT") return false;
-    const s = G.shift;
-    if (s.credits < DEPOT_COST) return false;
-    s.credits -= DEPOT_COST;
-    s.fuel = Math.min(START_FUEL, Math.max(0, s.fuel) + DEPOT_FUEL);
+    if (!depotReady()) return false;
+    const s = G.shift, d = G.depot;
+    if (s.credits < d.cost || d.gain <= 0) return false;
+    tap("resupply");
+    s.credits -= d.cost;                                       /* the listed price comes off in full */
+    s.fuel = Math.min(START_FUEL, Math.max(0, s.fuel) + d.gain);
     Sfx.play("resupply_confirm");
+    hideOffer();
+    d.phase = "fuel"; d.t = 1.1; d.next = "next";
+    toast(`<div class="t-head">REFUELLING</div><div class="t-sub">+${d.gain} FUEL &middot; -${fmtN(d.cost)} CREDITS</div>`);
     renderHUD();
-    nextContract();
     return true;
   }
 
   function decline() {
-    if (!G || G.state !== "DEPOT") return false;
-    if (G.shift.fuel <= 0) showOver(); else nextContract();
+    if (!depotReady()) return false;
+    tap("decline");
+    const d = G.depot;
+    hideOffer();
+    d.phase = "out"; d.next = G.shift.fuel <= 0 ? "over" : "next";
     return true;
+  }
+
+  function stepDepot(dt) {
+    const d = G.depot;
+    if (!d) return;
+    if (d.phase === "in") {
+      if (moveVessel(d, d.park, SUPPLY_SPEED, dt)) {
+        d.phase = "docked";
+        Sfx.loopStop("vessel_travel_loop");
+        Sfx.play("vessel_dock");
+        Sfx.play("depot_open");
+        showOffer();
+        updateSide();
+      }
+    } else if (d.phase === "fuel") {
+      d.t -= dt;
+      if (d.t <= 0) { hideToast(); d.phase = "out"; Sfx.loopStart("vessel_travel_loop"); }
+    } else if (d.phase === "out") {
+      if (moveVessel(d, d.corner, SUPPLY_SPEED * 1.2, dt)) {
+        Sfx.loopStop("vessel_travel_loop");
+        const next = d.next;
+        G.depot = null;
+        if (next === "over") showOver(); else nextContract();
+      }
+    }
   }
 
   /* ================= flow of a shift ================= */
@@ -690,6 +766,8 @@ const Triangulate = (() => {
   function startShift() {
     G.shift = newShift();
     G.contract = null;
+    G.depot = null;
+    hideOffer();
     hideScreen();
     Sfx.play("shift_start");
     renderHUD();
@@ -703,6 +781,8 @@ const Triangulate = (() => {
     G.state = "BRIEF";
     G.timer = BRIEF_S;
     G.flight = null;
+    G.depot = null;
+    hideOffer();
     hideScreen();
     Sfx.loopStop("vessel_travel_loop");
     Sfx.play("contract_assigned");
@@ -730,6 +810,7 @@ const Triangulate = (() => {
   function selectNode(i) {
     if (!G || G.state !== "SEARCH") return false;
     G.active = clamp(i, 0, 2);
+    tap("node" + G.active);
     Sfx.play("ui_click");
     updateSide();
     return true;
@@ -745,13 +826,17 @@ const Triangulate = (() => {
     return true;
   }
 
-  function nudge(d) { if (G && G.contract) setDial(activeNode().dial + d); }
+  function nudge(d) {
+    if (!G || !G.contract) return;
+    if (setDial(activeNode().dial + d)) tap("d" + (d > 0 ? "+" : "") + d);
+  }
 
   function lock() {
     if (!G || G.state !== "SEARCH") return false;
     const nd = activeNode();
     const s = nd.sm;
     nd.locked = nd.dial;
+    tap("lock");
     const cone = coneFor(G.contract.n);
     nd.wedge = cone > 0 ? cone * (1 + (1 - s) * 0.5) : 0;          /* a bare line at the climax */
     Sfx.play("lock_engage");
@@ -764,6 +849,7 @@ const Triangulate = (() => {
     if (!G || G.state !== "SEARCH") return false;
     G.contract.nodes.forEach(nd => { nd.locked = null; nd.wedge = 0; });
     G.contract.marker = null;
+    tap("reset");
     Sfx.play("bearing_clear");
     updateSide();
     return true;
@@ -782,6 +868,7 @@ const Triangulate = (() => {
   function unpin() {
     if (!G || G.state !== "SEARCH" || !G.contract.marker) return false;
     G.contract.marker = null;
+    tap("unpin");
     Sfx.play("ui_click");
     updateSide();
     return true;
@@ -804,6 +891,7 @@ const Triangulate = (() => {
     const err = dist(c.marker, c.target);
     const outcome = err <= tolClean(c.n) ? "clean" : err <= tolNear(c.n) ? "near" : "miss";
     G.state = "FLIGHT";
+    tap("transmit");
     Sfx.loopStop("signal_tone_loop"); Sfx.loopStop("static_loop");
     Sfx.play("transmit_send");
     say("dispatch_fix_received", DISPATCH.dispatch_fix_received, "DISPATCH");
@@ -876,14 +964,14 @@ const Triangulate = (() => {
       const acc = Math.round((1 - f.err / tolClean(c.n)) * 250);
       const tb = Math.round(Math.max(0, 500 * (1 - c.elapsed / 90)));
       pts = Math.round((1000 + lockB + acc + tb) * mult);
-      cr = CREDIT_CLEAN + CREDIT_STREAK * Math.min(s.streak, 5);
+      cr = Math.round((CREDIT_CLEAN + CREDIT_STREAK * Math.min(s.streak, 5)) * creditScale(c.n));
       s.streak++; s.clean++; s.breaches++;
       s.fuel -= FUEL_COST.clean - RESUPPLY;
       head = `FIX ACCEPTED <span class="dim">&middot; ERROR ${f.err.toFixed(1)} KM</span>`;
       lines = ["BOARDING VESSEL LAUNCHED.", "DOCKED. BREACH SUCCESSFUL.", "CONTRACT IN PROGRESS."];
     } else if (f.outcome === "near") {
       pts = 400 + (f.locks >= 3 ? 100 : 0);
-      cr = CREDIT_NEAR;
+      cr = Math.round(CREDIT_NEAR * creditScale(c.n));
       s.streak = 0; s.breaches++;
       s.fuel -= FUEL_COST.near - RESUPPLY;
       head = `WITHIN TOLERANCE <span class="dim">&middot; ERROR ${f.err.toFixed(1)} KM</span>`;
@@ -909,7 +997,7 @@ const Triangulate = (() => {
     const fuelNet = f.outcome === "clean" ? 0 : f.outcome === "near" ? -(FUEL_COST.near - RESUPPLY) : -FUEL_COST.miss;
     toast(`<div class="t-head">${head}</div>${lines.map(l => `<div class="t-line">${l}</div>`).join("")}
            <div class="t-stats"><span>${pts ? "+" + fmtN(pts) + " VALUE" + (mult > 1 && f.outcome === "clean" ? " (x" + mult.toFixed(1) + ")" : "") : "NO VALUE"}</span><span>${cr ? "+" + cr + " CR" : "NO CREDITS"}</span><span>FUEL ${fuelNet >= 0 ? "+" : ""}${fuelNet}</span></div>
-           <div class="t-sub">${depotDue() ? "SUPPLY DEPOT: " + (s.credits >= DEPOT_COST ? "OPEN NEXT." : "CLOSED (INSUFFICIENT CREDITS).") : ""}</div>
+           <div class="t-sub">${depotDue() ? "SUPPLY SHIP: " + (s.credits >= depotCostFor(s.contracts) ? "INBOUND NEXT (" + fmtN(depotCostFor(s.contracts)) + " CR)." : "NOT DISPATCHED (NEED " + fmtN(depotCostFor(s.contracts)) + " CR).") : ""}</div>
            <div class="t-sub">${s.fuel > 0 || depotDue() ? "NEXT CONTRACT SHORTLY. (CLICK OR TYPE skip)" : ""}</div>`);
     updateSide();
   }
@@ -919,7 +1007,7 @@ const Triangulate = (() => {
   function afterResult() {
     hideToast();
     const s = G.shift;
-    if (depotDue() && s.credits >= DEPOT_COST) showDepot();
+    if (depotDue() && s.credits >= depotCostFor(s.contracts)) startDepot();
     else if (s.fuel <= 0) showOver();
     else nextContract();
   }
@@ -987,7 +1075,7 @@ const Triangulate = (() => {
     R.root.querySelector('[data-a="transmit"]').disabled = !canTransmit();
     R.root.querySelector('[data-a="lock"]').disabled = !live;
     R.root.querySelector('[data-a="reset"]').disabled = !live;
-    R.root.querySelectorAll('[data-a^="d"]').forEach(b => { b.disabled = !live; });
+    R.root.querySelectorAll('.tri-steps button').forEach(b => { b.disabled = !live; });
   }
 
   /* ================= radar drawing ================= */
@@ -1136,6 +1224,21 @@ const Triangulate = (() => {
       }
     }
 
+    /* supply ship: a small yellow diamond that flies in from a corner and docks with the vessel */
+    if (G.depot) {
+      const sp = G.depot, p = WORLD(sp), x = Math.round(p.x), y = Math.round(p.y), cp = WORLD(sp.corner);
+      ctx.setLineDash([2, 4]);
+      ctx.strokeStyle = withAlpha("#ffe066", 0.45);
+      ctx.beginPath(); ctx.moveTo(cp.x, cp.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#ffe066";
+      ctx.beginPath(); ctx.moveTo(x, y - 5); ctx.lineTo(x + 5, y); ctx.lineTo(x, y + 5); ctx.lineTo(x - 5, y); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = withAlpha("#ffe066", 0.5);
+      ctx.strokeRect(x - 8.5, y - 8.5, 17, 17);
+      ctx.fillStyle = withAlpha("#ffe066", 0.85);
+      ctx.fillText("SUP", clamp(x + 11, 2, RES - 22), clamp(y - 4, 2, RES - 10));
+    }
+
     /* faint scanline texture */
     ctx.fillStyle = "rgba(0,0,0,.14)";
     for (let y = 0; y < RES; y += 3) ctx.fillRect(0, y, RES, 1);
@@ -1214,6 +1317,10 @@ const Triangulate = (() => {
     else if (G.state === "RESULT") {
       G.timer -= dt;
       if (G.timer <= 0) afterResult();
+    }
+    else if (G.state === "DEPOT") {
+      stepDepot(dt);
+      G.R.sig.textContent = "--%"; G.R.sigbar.style.width = "0%";
     }
 
     drawRadar();
@@ -1338,10 +1445,10 @@ const Triangulate = (() => {
       }
       case "unpin": case "unmark": return need(unpin(), "NO PIN TO LIFT.");
       case "resupply": case "buy": case "refuel": {
-        if (G.state !== "DEPOT") return need(false, "THE SUPPLY DEPOT IS NOT OPEN.");
-        return need(resupply(), "NOT ENOUGH CREDITS.");
+        if (!depotReady()) return need(false, "NO SUPPLY SHIP IS DOCKED.");
+        return need(resupply(), G.depot.gain <= 0 ? "FUEL RESERVE IS ALREADY FULL." : "NOT ENOUGH CREDITS: NEED " + fmtN(G.depot.cost) + ".");
       }
-      case "decline": case "pass": return need(decline(), "THE SUPPLY DEPOT IS NOT OPEN.");
+      case "decline": case "pass": return need(decline(), "NO SUPPLY SHIP IS DOCKED.");
       case "transmit": case "send": return need(transmit(), "NOTHING TO TRANSMIT RIGHT NOW.");
       default: return false;
     }
@@ -1350,7 +1457,7 @@ const Triangulate = (() => {
   /* exported for tests */
   const _test = {
     makeContract, lobe, nodeSignal, bearingTo, pointAt, angDiff, ratingFor,
-    get G() { return G; }, tolClean, tolNear, coneFor, edgeDock, markerSignal, DEPOT_COST, DEPOT_FUEL, finishContract, newShift
+    get G() { return G; }, tolClean, tolNear, coneFor, edgeDock, markerSignal, DEPOT_COST, DEPOT_FUEL, depotCostFor, creditScale, finishContract, newShift
   };
 
   return { open, handleInput, _test };
