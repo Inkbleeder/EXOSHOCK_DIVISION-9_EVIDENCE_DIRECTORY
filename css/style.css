@@ -1582,3 +1582,82 @@ html, body, * {
     .tri-side{ flex:1 1 100%; }
     .scr-title{ font-size:19px; letter-spacing:3px; }
 }
+
+
+/* ===========================================================
+   BVS-2: pressed buttons (same feel as the EXOFM keys)
+   Every pressable button in the minigame sits on a ledge and
+   sinks into it when pressed. Keyboard and typed actions add
+   .tap for a moment (tap() in triangulate.js).
+   =========================================================== */
+
+.tri-b,
+.tri-steps button,
+.tri-node{
+    transform:translateY(0);
+    transition:transform .06s ease-out, box-shadow .06s ease-out, background .06s;
+}
+
+.tri-b{ box-shadow:0 3px 0 rgba(var(--green-rgb),.5); }
+.tri-b.go{ box-shadow:0 3px 0 rgba(var(--green-rgb),.5), 0 0 10px rgba(var(--green-rgb),.35); }
+.tri-b.alt{ box-shadow:0 3px 0 rgba(var(--green-rgb),.3); }
+.tri-steps button{ box-shadow:0 2px 0 rgba(var(--green-rgb),.4); }
+.tri-node{ box-shadow:0 2px 0 var(--nc, var(--green)); }
+.tri-node.sel{ box-shadow:0 2px 0 var(--nc, var(--green)), 0 0 10px var(--nc, var(--green)); }
+
+.tri-b:active:not(:disabled),
+.tri-b.tap,
+.tri-steps button:active:not(:disabled),
+.tri-steps button.tap{
+    transform:translateY(3px);
+    color:var(--green);
+    background:rgba(var(--green-rgb),.28);
+    box-shadow:0 0 0 rgba(0,0,0,0), inset 0 0 8px rgba(var(--green-rgb),.35);
+}
+.tri-steps button:active:not(:disabled),
+.tri-steps button.tap{ transform:translateY(2px); }
+
+.tri-node:active:not(:disabled),
+.tri-node.tap{
+    transform:translateY(2px);
+    opacity:1;
+    background:rgba(255,255,255,.14);
+    box-shadow:0 0 0 rgba(0,0,0,0), inset 0 0 8px var(--nc, var(--green));
+}
+
+.tri-b:disabled, .tri-steps button:disabled{ box-shadow:none; }
+
+/* supply ship offer: two large buttons over the lower part of the radar */
+.tri-offer{
+    display:none;
+    position:absolute;
+    left:0; right:0; bottom:0;
+    padding:12px;
+    background:rgba(1,6,3,.92);
+    border:1px solid var(--border);
+    border-bottom:none;
+    text-align:center;
+    z-index:6;
+}
+.tri-offer.on{ display:block; animation:help-fade-in .15s ease; }
+.o-head{ font-weight:bold; letter-spacing:3px; color:var(--yellow); }
+.o-sub{ font-size:10px; opacity:.7; margin:4px 0 10px; }
+.o-btns{ display:flex; gap:10px; }
+.tri-btns .tri-b.big, .tri-b.big{
+    flex:1 1 0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:3px;
+    padding:14px 8px;
+    font-size:15px;
+    letter-spacing:3px;
+}
+.tri-b.big small{ font-size:10px; letter-spacing:1px; opacity:.75; font-weight:normal; }
+
+.tri-offer.top{
+    bottom:auto;
+    top:0;
+    border-bottom:1px solid var(--border);
+    border-top:none;
+}
