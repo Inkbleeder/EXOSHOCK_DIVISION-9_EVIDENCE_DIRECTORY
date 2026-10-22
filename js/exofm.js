@@ -54,6 +54,7 @@ const ExoFM = (() => {
     { name: "Track 01", file: "track_01.mp3" },
     { name: "Track 02", file: "track_02.mp3" },
     { name: "Track 03", file: "track_03.mp3" },
+    { name: "Track 04", file: "track_04.mp3" },
     /* more:  "my_song.mp3",   or   { name: "Night Shift", file: "night_shift.mp3" }, */
   ];
 
