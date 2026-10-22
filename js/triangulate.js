@@ -25,8 +25,8 @@
      After every 5th contract the NEXT round opens with a supply ship: it flies in
      from a random corner of the sector and docks with the boarding vessel while
      that is still at its dock on the sector edge. Two buttons on the radar let you
-     take the fuel (the listed credits are deducted, and the price rises with
-     difficulty) or turn it down; then the contract starts. No fuel = shift over.
+     take the fuel (the listed credits are deducted; the price starts at 300 and
+     rises by 100 after every resupply you buy) or turn it down; then the contract starts. No fuel = shift over.
 
    CONTROLS (mouse, keyboard and typed - the terminal stays usable)
      dial: drag the knob, or buttons, or ArrowLeft / ArrowRight (Shift = x5)
@@ -58,9 +58,9 @@ const Triangulate = (() => {
   const CONE_START = 24;                      /* wedge half-angle (deg) on contract 1 */
   const TOL_START = 7.0, TOL_END = 1.2;       /* clean-fix radius (km), first -> last */
   const CREDIT_CLEAN = 140, CREDIT_STREAK = 15, CREDIT_NEAR = 60;
-  const DEPOT_EVERY = 5, DEPOT_COST = 300, DEPOT_FUEL = 50;   /* DEPOT_COST = price on contract 1 */
+  const DEPOT_EVERY = 5, DEPOT_COST = 300, DEPOT_FUEL = 50;   /* DEPOT_COST = price of the first resupply */
   const CREDIT_GROWTH = 0.12;                 /* +12% credits per contract past the first */
-  const DEPOT_GROWTH = 0.18;                  /* +18% resupply price per contract past the first */
+  const DEPOT_STEP = 100;                     /* credits added to the price after each resupply you buy */
   const SUPPLY_SPEED = 30;                    /* km per second, supply ship */
   const DOCK_GAP = 7;                         /* km: the supply ship parks this far from the boarding vessel at the dock */
   const VESSEL_SPEED = 34;                    /* km per second */
@@ -93,7 +93,8 @@ const Triangulate = (() => {
   const tolNear = n => tolClean(n) * 2.2;
   /* credits and the resupply price both climb with the contract number (the price faster) */
   const creditScale = n => 1 + CREDIT_GROWTH * Math.max(0, n - 1);
-  const depotCostFor = n => Math.round(DEPOT_COST * (1 + DEPOT_GROWTH * Math.max(0, n - 1)) / 10) * 10;
+  /* the price only moves when you BUY: resupply 1 = 300, resupply 2 = 400, ... (declining does not raise it) */
+  const depotCostFor = bought => DEPOT_COST + DEPOT_STEP * Math.max(0, bought);
   const CORNERS = [{ x: 3, y: 3 }, { x: 97, y: 3 }, { x: 3, y: 97 }, { x: 97, y: 97 }];
   /* the boarding vessel launches from a random point on the sector's edge */
   function edgeDock() {
@@ -361,7 +362,7 @@ const Triangulate = (() => {
   }
 
   function newShift() {
-    return { fuel: START_FUEL, credits: 0, earned: 0, value: 0, breaches: 0, clean: 0, recalls: 0, contracts: 0, streak: 0, newBest: false };
+    return { fuel: START_FUEL, credits: 0, earned: 0, value: 0, breaches: 0, clean: 0, recalls: 0, contracts: 0, streak: 0, resupplies: 0, newBest: false };
   }
 
   /* ================= contracts ================= */
@@ -617,7 +618,7 @@ const Triangulate = (() => {
         <p><b>1. LISTEN.</b> Pick a node. Turn its dial. The meter and tone rise as you near the ship. Lock the bearing at the peak. Each lock draws a cone: wide on early contracts, narrower every contract, and a bare line at the end. Late contracts need a near-perfect bearing.</p>
         <p><b>2. CROSS.</b> Lock at least two nodes (three is better). Click the radar where the cones meet to pin your estimate. The pin reads back a signal strength: the ship is at the peak, and the reading is steadier the closer you are. Right-click, UNPIN or Delete to lift it and try again.</p>
         <p><b>3. TRANSMIT.</b> The boarding vessel launches from a different point on the sector edge each contract and flies to your pin. If the ship is there, it docks and breaches. Near misses cost extra fuel. A miss is recalled.</p>
-        <p><b>FUEL</b> is the main limit. Clean fix: no net cost. Near: 10. Miss: 35. At zero the shift ends. <b>CREDITS</b> are earned per breach, and pay more the deeper into the shift you are. After every 5th contract the next round opens with a supply ship flying in from a corner to meet the boarding vessel at the dock on the sector edge. Press RESUPPLY to buy ${DEPOT_FUEL} fuel (the price is deducted in full, ${DEPOT_COST} credits at first and more every contract) or DECLINE to send it away. The search starts afterwards.</p>
+        <p><b>FUEL</b> is the main limit. Clean fix: no net cost. Near: 10. Miss: 35. At zero the shift ends. <b>CREDITS</b> are earned per breach, and pay more the deeper into the shift you are. After every 5th contract the next round opens with a supply ship flying in from a corner to meet the boarding vessel at the dock on the sector edge. Press RESUPPLY to buy ${DEPOT_FUEL} fuel (the price is deducted in full, ${DEPOT_COST} credits the first time, then ${DEPOT_STEP} more after every resupply you buy) or DECLINE to send it away. The search starts afterwards.</p>
         <p class="legend"><span class="lg tri-sym" style="color:#ffb347">&#9650;</span> NODE &nbsp; <span class="lg sq">&#9632;</span> SHIP (once found) &nbsp; <span class="lg ci">&#9679;</span> BOARDING VESSEL &nbsp; <span class="lg" style="color:#fff">+</span> YOUR ESTIMATE</p>
         <p class="keys"><b>KEYS</b> ArrowLeft / ArrowRight turn the dial (Shift = x5) &middot; Space locks &middot; 1 2 3 pick a node &middot; Delete unpins &middot; only while the terminal line is empty.<br><b>TYPED</b> bearing 045 &middot; node 2 &middot; lock &middot; reset &middot; mark 42 63 &middot; unpin &middot; transmit &middot; resupply &middot; decline &middot; skip &middot; quit</p>
       </div>
@@ -684,7 +685,7 @@ const Triangulate = (() => {
     G.flight = null;
     G.depot = {
       phase: "in", corner, park, x: corner.x, y: corner.y, t: 0, next: "next",
-      cost: depotCostFor(s.contracts),
+      cost: depotCostFor(s.resupplies),
       gain: Math.min(DEPOT_FUEL, START_FUEL - Math.max(0, s.fuel))
     };
     hideToast();
@@ -726,6 +727,7 @@ const Triangulate = (() => {
     if (s.credits < d.cost || d.gain <= 0) return false;
     tap("resupply");
     s.credits -= d.cost;                                       /* the listed price comes off in full */
+    s.resupplies++;                                            /* the NEXT resupply costs DEPOT_STEP more */
     s.fuel = Math.min(START_FUEL, Math.max(0, s.fuel) + d.gain);
     Sfx.play("resupply_confirm");
     hideOffer();
@@ -1013,7 +1015,7 @@ const Triangulate = (() => {
     const fuelNet = f.outcome === "clean" ? 0 : f.outcome === "near" ? -(FUEL_COST.near - RESUPPLY) : -FUEL_COST.miss;
     toast(`<div class="t-head">${head}</div>${lines.map(l => `<div class="t-line">${l}</div>`).join("")}
            <div class="t-stats"><span>${pts ? "+" + fmtN(pts) + " VALUE" + (mult > 1 && f.outcome === "clean" ? " (x" + mult.toFixed(1) + ")" : "") : "NO VALUE"}</span><span>${cr ? "+" + cr + " CR" : "NO CREDITS"}</span><span>FUEL ${fuelNet >= 0 ? "+" : ""}${fuelNet}</span></div>
-           <div class="t-sub">${depotDue() ? "SUPPLY SHIP " + (s.credits >= depotCostFor(s.contracts) ? "MEETS THE VESSEL AT THE DOCK NEXT ROUND (" + fmtN(depotCostFor(s.contracts)) + " CR)." : "NOT DISPATCHED (NEED " + fmtN(depotCostFor(s.contracts)) + " CR).") : ""}</div>
+           <div class="t-sub">${depotDue() ? "SUPPLY SHIP " + (s.credits >= depotCostFor(s.resupplies) ? "MEETS THE VESSEL AT THE DOCK NEXT ROUND (" + fmtN(depotCostFor(s.resupplies)) + " CR)." : "NOT DISPATCHED (NEED " + fmtN(depotCostFor(s.resupplies)) + " CR).") : ""}</div>
            <div class="t-sub">${s.fuel > 0 || depotDue() ? "NEXT CONTRACT SHORTLY. (CLICK OR TYPE skip)" : ""}</div>`);
     updateSide();
   }
@@ -1023,7 +1025,7 @@ const Triangulate = (() => {
   function afterResult() {
     hideToast();
     const s = G.shift;
-    G.depotPending = depotDue() && s.credits >= depotCostFor(s.contracts);
+    G.depotPending = depotDue() && s.credits >= depotCostFor(s.resupplies);
     if (s.fuel <= 0 && !G.depotPending) showOver();
     else nextContract();
   }
