@@ -37,7 +37,7 @@
 
    SOUNDS
    Everything has a built-in synthesised stand-in, so the game works with no
-   files. To use real recordings, drop WAVs named exactly as in SOUNDS_FOR_CREATOR
+   files. To use real recordings, drop WAVs named exactly as in SOUND_LIST (below)
    into the site's normal  audio/  folder with the prefix bvs_  (e.g.
    audio/bvs_radar_ping.wav). Any file found is used in place of its stand-in; a
    missing file silently falls back. Hiding-ship chatter is voice only: no text is
@@ -121,6 +121,56 @@ const Triangulate = (() => {
     sys_transmit_open:   "Transmission window open."
   };
 
+
+  /* ================= SOUND_LIST: every sound the game can play =================
+     File name = audio/bvs_<name>.wav  (e.g. audio/bvs_radar_ping.wav).
+     A file that exists replaces its built-in stand-in; a missing one is fine.
+     Loops are marked (loop). Type  Triangulate.sounds()  in the browser console
+     to see which files the game found and which are still missing. */
+  const SOUND_LIST = {
+    "Ambience and radar": [
+      "ambience_space_loop",   /* (loop) deep-space bed, from the moment the game opens until it closes */
+      "radar_ping",            /* once per full radar sweep */
+      "dial_tick",             /* each notch of the dial */
+      "signal_tone_loop",      /* (loop) the hot / cold tone; pitch and volume follow the signal */
+      "static_loop"            /* (loop) noise bed, louder as the signal gets weaker */
+    ],
+    "Player actions": [
+      "lock_engage",           /* bearing locked */
+      "marker_place",          /* position estimate placed */
+      "transmit_send"          /* fix transmitted */
+    ],
+    "Boarding vessel and supply ship": [
+      "vessel_launch",         /* vessel leaves the dock; also the supply ship setting off */
+      "vessel_travel_loop",    /* (loop) engine hum while a vessel or the supply ship is flying */
+      "vessel_dock",           /* docking with the hiding ship; also the supply ship docking */
+      "breach_success",        /* breach confirmed */
+      "vessel_recall"          /* nothing found, vessel called back (also a refused transmit) */
+    ],
+    "Shift flow": [
+      "shift_start",           /* BEGIN SHIFT */
+      "contract_assigned",     /* new contract */
+      "shift_over"             /* shift ended */
+    ],
+    "Polish": [
+      "node_online",           /* x3 at the start of every contract */
+      "new_best_shift",        /* new session best */
+      "fuel_warning_loop",     /* (loop) low-fuel alarm, 0.75 s pulse */
+      "ui_click",              /* any button */
+      "bearing_clear"          /* RESET */
+    ],
+    "Credits and supply ship": [
+      "credits_earned",        /* credits added after a breach */
+      "depot_open",            /* supply ship docked, offer appears */
+      "resupply_confirm"       /* fuel bought */
+    ]
+    /* voices: pilot_01-06, comms_01-06, crew_01-06 (hiding-ship chatter), reaction_01-06
+       (vessel reaches them), the dispatch_* lines and the sys_* lines are generated from
+       VOICE_GROUPS, DISPATCH and SYS above. */
+  };
+  const SOUND_NAMES = [].concat(...Object.keys(SOUND_LIST).map(k => SOUND_LIST[k]));
+  const ALL_SOUNDS = SOUND_NAMES.concat(VOICE_FILES, Object.keys(DISPATCH), Object.keys(SYS));
+
   /* ================= sound engine ================= */
 
   const Sfx = (() => {
@@ -144,12 +194,14 @@ const Triangulate = (() => {
 
     function probe(name) {
       if (files[name]) return files[name];
-      const f = files[name] = { ok: null, el: null };
+      const f = files[name] = { ok: null, el: null, wait: [] };
+      /* callbacks queued while the file was still loading run once the answer is known */
+      const done = ok => { f.ok = ok; f.wait.splice(0).forEach(fn => { try { fn(); } catch (e) {} }); };
       try {
         const a = new Audio();
         a.preload = "auto";
-        a.addEventListener("canplaythrough", () => { f.ok = true; }, { once: true });
-        a.addEventListener("error", () => { f.ok = false; }, { once: true });
+        a.addEventListener("canplaythrough", () => done(true), { once: true });
+        a.addEventListener("error", () => done(false), { once: true });
         a.src = AUDIO_DIR + AUDIO_PREFIX + name + ".wav";
         f.el = a;
       } catch (e) { f.ok = false; }
@@ -312,10 +364,20 @@ const Triangulate = (() => {
         return;
       }
       if (LOOPS[name] && ac()) { const h = LOOPS[name](); if (h) loops[name] = h; }
+      /* The file is still loading (e.g. the ambience starts the moment the game opens),
+         so the stand-in is running for now. As soon as the file turns out to exist,
+         swap the stand-in for it, keeping the level the game had set. */
+      if (f.ok === null) f.wait.push(() => {
+        const h = loops[name];
+        if (!h || h.wav || !f.ok) return;
+        const v = h.v;
+        loopStop(name); loopStart(name);
+        if (v !== undefined) loopSet(name, v);
+      });
     }
     function loopSet(name, v) {
       const h = loops[name];
-      if (h) { try { h.set(muted() ? 0 : v); } catch (e) {} }
+      if (h) { h.v = v; try { h.set(muted() ? 0 : v); } catch (e) {} }
     }
     function loopStop(name) {
       const h = loops[name];
@@ -330,6 +392,13 @@ const Triangulate = (() => {
       if (standIn && SYN[standIn]) SYN[standIn]();
     }
     function preload(list) { list.forEach(probe); }
+    /* what the console command Triangulate.sounds() prints */
+    function report(list) {
+      return list.map(n => {
+        const f = probe(n);
+        return { file: AUDIO_DIR + AUDIO_PREFIX + n + ".wav", status: f.ok === true ? "found" : f.ok === false ? "missing" : "loading..." };
+      });
+    }
 
     /* called every frame: keep everything in step with the site's MUTE */
     function sync() {
@@ -342,7 +411,7 @@ const Triangulate = (() => {
       });
     }
 
-    return { play, loopStart, loopSet, loopStop, stopAll, voice, preload, resume, sync };
+    return { play, loopStart, loopSet, loopStop, stopAll, voice, preload, report, resume, sync };
   })();
 
   /* ================= state ================= */
@@ -532,11 +601,7 @@ const Triangulate = (() => {
     });
 
     wire();
-    Sfx.preload(["ambience_space_loop", "radar_ping", "dial_tick", "signal_tone_loop", "static_loop",
-                 "lock_engage", "marker_place", "transmit_send", "vessel_launch", "vessel_travel_loop",
-                 "vessel_dock", "breach_success", "vessel_recall", "shift_start", "contract_assigned",
-                 "shift_over", "node_online", "new_best_shift", "fuel_warning_loop", "ui_click", "bearing_clear",
-                 "credits_earned", "depot_open", "resupply_confirm"].concat(VOICE_FILES, Object.keys(DISPATCH), Object.keys(SYS)));
+    Sfx.preload(ALL_SOUNDS);
     Sfx.loopStart("ambience_space_loop");
     Sfx.loopSet("ambience_space_loop", 1);
     showMenu();
@@ -1479,5 +1544,14 @@ const Triangulate = (() => {
     get G() { return G; }, tolClean, tolNear, coneFor, edgeDock, markerSignal, DEPOT_COST, DEPOT_FUEL, depotCostFor, creditScale, finishContract, newShift
   };
 
-  return { open, handleInput, _test };
+  /* console helper: Triangulate.sounds() lists every sound file and whether the game found it */
+  function sounds() {
+    const r = Sfx.report(ALL_SOUNDS);
+    const found = r.filter(x => x.status === "found").length, missing = r.filter(x => x.status === "missing").length;
+    if (console.table) console.table(r);
+    console.log("[bvs] " + found + " found, " + missing + " missing, " + (r.length - found - missing) + " still loading, of " + r.length + " sounds. Missing files use the built-in stand-in.");
+    return r;
+  }
+
+  return { open, handleInput, sounds, _test };
 })();
