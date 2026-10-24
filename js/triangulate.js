@@ -174,7 +174,12 @@ const Triangulate = (() => {
   /* ================= sound engine ================= */
 
   const Sfx = (() => {
-    let ctx = null, master = null, noiseBuf = null;
+    let ctx = null, master = null, bus = null, noiseBuf = null, lastResume = 0;
+    /* Recordings are decoded once into memory and played through Web Audio (no <audio> elements:
+       browsers cap those, and a refused play() used to leave a loop silently dead). Opened straight
+       from disk (file://) fetch is blocked, so that case keeps the old element route. */
+    const BUFFERED = !!(window.AudioContext || window.webkitAudioContext) && typeof fetch === "function" && location.protocol !== "file:";
+    const lastPick = {};
     const files = {};        /* name -> { ok: null|true|false, el } */
     const loops = {};        /* name -> handle */
     const lastPlay = {};
@@ -186,6 +191,9 @@ const Triangulate = (() => {
         master = ctx.createGain();
         master.gain.value = 0.5;
         master.connect(ctx.destination);
+        bus = ctx.createGain();            /* every recording goes through here: one place for MUTE */
+        bus.gain.value = muted() ? 0 : 1;
+        bus.connect(ctx.destination);
       } catch (e) { ctx = null; }
       return ctx;
     }
@@ -194,17 +202,33 @@ const Triangulate = (() => {
 
     function probe(name) {
       if (files[name]) return files[name];
-      const f = files[name] = { ok: null, el: null, wait: [] };
+      const f = files[name] = { ok: null, buf: null, el: null, wait: [] };
       /* callbacks queued while the file was still loading run once the answer is known */
       const done = ok => { f.ok = ok; f.wait.splice(0).forEach(fn => { try { fn(); } catch (e) {} }); };
+      const url = AUDIO_DIR + AUDIO_PREFIX + name + ".wav";
+      if (BUFFERED && ac()) {
+        let tries = 0;
+        const load = () => {
+          fetch(url).then(r => {
+            if (r.status === 404 || r.status === 403 || r.status === 410) { done(false); return null; }   /* no such file */
+            if (!r.ok) throw new Error("http " + r.status);
+            return r.arrayBuffer();
+          }).then(ab => {
+            if (!ab) return null;
+            return new Promise((res, rej) => ctx.decodeAudioData(ab, res, rej)).then(buf => { f.buf = buf; done(true); });
+          }).catch(() => { if (++tries < 3) setTimeout(load, 800 * tries); else done(false); });   /* transient error: retry, then give up */
+        };
+        load();
+        return f;
+      }
       try {
         const a = new Audio();
         a.preload = "auto";
         a.addEventListener("canplaythrough", () => done(true), { once: true });
         a.addEventListener("error", () => done(false), { once: true });
-        a.src = AUDIO_DIR + AUDIO_PREFIX + name + ".wav";
+        a.src = url;
         f.el = a;
-      } catch (e) { f.ok = false; }
+      } catch (e) { f.ok = false; done(false); }
       return f;
     }
 
@@ -327,6 +351,22 @@ const Triangulate = (() => {
 
     const LOOP_VOL = { ambience_space_loop: 0.5, signal_tone_loop: 0.7, static_loop: 0.6, vessel_travel_loop: 0.6, fuel_warning_loop: 0.5 };
 
+    /* plays one copy of a loaded recording; true if it started */
+    function fileOnce(f, vol) {
+      try {
+        if (f.buf && ctx && bus) {
+          const src = ctx.createBufferSource(), g = ctx.createGain();
+          src.buffer = f.buf; g.gain.value = vol;
+          src.connect(g); g.connect(bus);
+          src.onended = () => { try { src.disconnect(); g.disconnect(); } catch (e) {} };
+          src.start();
+          return true;
+        }
+        if (f.el) { const a = f.el.cloneNode(); a.volume = vol; a.play().catch(() => {}); return true; }
+      } catch (e) { /* fall through to the stand-in */ }
+      return false;
+    }
+
     function play(name, opts) {
       if (muted()) return;
       resume();
@@ -334,42 +374,62 @@ const Triangulate = (() => {
       if (lastPlay[name] && now - lastPlay[name] < 25) return;
       lastPlay[name] = now;
       const f = probe(name);
-      if (f.ok && f.el) {
-        try {
-          const a = f.el.cloneNode();
-          a.volume = clamp((opts && opts.volume) || 0.8, 0, 1);
-          a.play().catch(() => {});
-          return;
-        } catch (e) { /* fall through to the stand-in */ }
-      }
+      if (f.ok && fileOnce(f, clamp((opts && opts.volume) || 0.8, 0, 1))) return;
       if (SYN[name]) SYN[name](opts);
     }
 
-    function loopStart(name) {
-      if (loops[name]) return;
-      resume();
-      const f = probe(name);
-      if (f.ok && f.el) {
+    /* the file loop: gain follows the game's level; the hot/cold tone also bends its pitch */
+    function startFileLoop(name, f) {
+      const base = LOOP_VOL[name] || 0.6;
+      const fixed = name === "ambience_space_loop" || name === "vessel_travel_loop" || name === "fuel_warning_loop";
+      if (f.buf && ctx && bus) {
+        const src = ctx.createBufferSource(), g = ctx.createGain();
+        src.buffer = f.buf; src.loop = true;
+        g.gain.value = fixed ? base * 0.5 : 0;
+        src.connect(g); g.connect(bus); src.start();
+        const h = { file: true, base, fixed, src, g };
+        h.set = v => {
+          const t = ctx.currentTime;
+          const level = fixed ? base * 0.5 : name === "static_loop" ? clamp((1 - v) * base, 0, 1) : clamp(v * base, 0, 1);
+          g.gain.setTargetAtTime(level, t, 0.03);
+          if (name === "signal_tone_loop") src.playbackRate.setTargetAtTime(0.6 + 1.2 * v, t, 0.03);
+        };
+        h.stop = () => {
+          try { const t = ctx.currentTime; g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, 0.02); src.stop(t + 0.12); } catch (e) {}
+          setTimeout(() => { try { src.disconnect(); g.disconnect(); } catch (e) {} }, 400);
+        };
+        loops[name] = h;
+        return true;
+      }
+      if (f.el) {
         const a = f.el.cloneNode(); a.loop = true; a.volume = 0;
         a.play().catch(() => {});
-        const h = { wav: a, base: LOOP_VOL[name] || 0.6 };
+        const h = { file: true, wav: a, base };
         h.set = v => {
           a.volume = clamp(v * h.base, 0, 1);
           if (name === "signal_tone_loop") a.playbackRate = 0.6 + 1.2 * v;
           if (name === "static_loop") a.volume = clamp((1 - v) * h.base, 0, 1);
         };
         h.stop = () => { try { a.pause(); } catch (e) {} };
-        if (name === "ambience_space_loop" || name === "vessel_travel_loop" || name === "fuel_warning_loop") { h.fixed = true; a.volume = h.base * 0.5; }
+        if (fixed) { h.fixed = true; a.volume = h.base * 0.5; }
         loops[name] = h;
-        return;
+        return true;
       }
+      return false;
+    }
+
+    function loopStart(name) {
+      if (loops[name]) return;
+      resume();
+      const f = probe(name);
+      if (f.ok && startFileLoop(name, f)) return;
       if (LOOPS[name] && ac()) { const h = LOOPS[name](); if (h) loops[name] = h; }
       /* The file is still loading (e.g. the ambience starts the moment the game opens),
          so the stand-in is running for now. As soon as the file turns out to exist,
          swap the stand-in for it, keeping the level the game had set. */
       if (f.ok === null) f.wait.push(() => {
         const h = loops[name];
-        if (!h || h.wav || !f.ok) return;
+        if (!h || h.file || !f.ok) return;
         const v = h.v;
         loopStop(name); loopStart(name);
         if (v !== undefined) loopSet(name, v);
@@ -384,12 +444,36 @@ const Triangulate = (() => {
       if (h) { try { h.stop(); } catch (e) {} delete loops[name]; }
     }
     function stopAll() { Object.keys(loops).forEach(loopStop); }
+
     function voice(name, standIn) {
       if (muted()) return;
       resume();
       const f = probe(name);
-      if (f.ok && f.el) { try { const a = f.el.cloneNode(); a.volume = 0.9; a.play().catch(() => {}); return; } catch (e) {} }
+      if (f.ok && fileOnce(f, 0.9)) return;
+      if (f.ok === null) {
+        /* still loading: say it as soon as it is in, if that is soon enough to still make sense */
+        const t0 = Date.now();
+        f.wait.push(() => {
+          if (muted() || Date.now() - t0 > 4000) return;
+          if (!(f.ok && fileOnce(f, 0.9)) && standIn && SYN[standIn]) SYN[standIn]();
+        });
+        return;
+      }
       if (standIn && SYN[standIn]) SYN[standIn]();
+    }
+
+    /* Choose which line of a set to play, from the files that actually exist:
+       one available = that one every time; several = random among them (never the same
+       line twice in a row); none = null (the caller falls back to its stand-in). */
+    function pick(names, key) {
+      const ready = names.filter(n => probe(n).ok === true);
+      const pool = ready.length ? ready : names.filter(n => probe(n).ok === null);   /* not decided yet: allow */
+      if (!pool.length) return null;
+      if (pool.length === 1) return pool[0];
+      const fresh = pool.filter(n => n !== lastPick[key]);
+      const n = fresh[Math.floor(Math.random() * fresh.length)];
+      lastPick[key] = n;
+      return n;
     }
     function preload(list) { list.forEach(probe); }
     /* what the console command Triangulate.sounds() prints */
@@ -400,10 +484,15 @@ const Triangulate = (() => {
       });
     }
 
-    /* called every frame: keep everything in step with the site's MUTE */
+    /* called every frame: keep everything in step with the site's MUTE, and keep the audio running */
     function sync() {
       const m = muted();
       if (master) master.gain.value = m ? 0 : 0.5;
+      if (bus) bus.gain.value = m ? 0 : 1;
+      if (ctx && ctx.state !== "running") {                 /* suspended before the first click, or interrupted (phones) */
+        const now = Date.now();
+        if (now - lastResume > 1000) { lastResume = now; try { ctx.resume().catch(() => {}); } catch (e) {} }
+      }
       Object.keys(loops).forEach(n => {
         const h = loops[n];
         if (h.wav && h.fixed) h.wav.volume = m ? 0 : h.base * 0.5;
@@ -411,7 +500,15 @@ const Triangulate = (() => {
       });
     }
 
-    return { play, loopStart, loopSet, loopStop, stopAll, voice, preload, report, resume, sync };
+    /* what is looping right now (for tests and the console) */
+    function peek() {
+      return { ctx: ctx ? ctx.state : "none", bus: bus ? +bus.gain.value.toFixed(2) : null, loops: Object.keys(loops).map(n => {
+        const h = loops[n];
+        return { name: n, file: !!h.file, gain: h.g ? +h.g.gain.value.toFixed(3) : null, rate: h.src ? +h.src.playbackRate.value.toFixed(2) : null };
+      }) };
+    }
+
+    return { play, loopStart, loopSet, loopStop, stopAll, voice, pick, preload, report, resume, sync, peek };
   })();
 
   /* ================= state ================= */
@@ -1031,10 +1128,15 @@ const Triangulate = (() => {
     say(voiceName("reaction"), "", "INTERCEPT");
   }
 
-  /* picks one recorded line of a group; returns its file name (no text exists for it) */
-  function voiceName(group) {
-    return group + "_" + pad(1 + Math.floor(Math.random() * VOICE_GROUPS[group]), 2);
+  /* Which line to play: whichever recordings of these groups actually exist. One file = that one
+     every time; several = random among them (not the same line twice in a row); none = the
+     first name, so the usual stand-in / silence rules apply. */
+  function voiceFor(groups) {
+    const names = VOICE_FILES.filter(n => groups.some(g => n.indexOf(g + "_") === 0));
+    return Sfx.pick(names, groups.join("+")) || names[0];
   }
+  function voiceName(group) { return voiceFor([group]); }
+
 
   function finishContract() {
     const s = G.shift, c = G.contract, f = G.flight;
@@ -1074,9 +1176,9 @@ const Triangulate = (() => {
       if (!s.newBest) { s.newBest = true; }
     }
     s.fuel = Math.max(0, s.fuel);
-    renderHUD();
-    G.state = "RESULT";
+    G.state = "RESULT";          /* before renderHUD(), so the low-fuel alarm starts right away */
     G.timer = RESULT_S;
+    renderHUD();
     const fuelNet = f.outcome === "clean" ? 0 : f.outcome === "near" ? -(FUEL_COST.near - RESUPPLY) : -FUEL_COST.miss;
     toast(`<div class="t-head">${head}</div>${lines.map(l => `<div class="t-line">${l}</div>`).join("")}
            <div class="t-stats"><span>${pts ? "+" + fmtN(pts) + " VALUE" + (mult > 1 && f.outcome === "clean" ? " (x" + mult.toFixed(1) + ")" : "") : "NO VALUE"}</span><span>${cr ? "+" + cr + " CR" : "NO CREDITS"}</span><span>FUEL ${fuelNet >= 0 ? "+" : ""}${fuelNet}</span></div>
@@ -1111,8 +1213,7 @@ const Triangulate = (() => {
   }
 
   function intercept() {
-    const groups = ["pilot", "comms", "crew"];
-    say(voiceName(groups[Math.floor(Math.random() * groups.length)]), "", "INTERCEPT");
+    say(voiceFor(["pilot", "comms", "crew"]), "", "INTERCEPT");
   }
 
   /* ================= HUD / side panel ================= */
