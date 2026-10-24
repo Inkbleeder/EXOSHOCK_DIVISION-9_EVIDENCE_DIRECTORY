@@ -37,6 +37,8 @@ const Sound = (() => {
   const sounds = {};
   let isMuted = false;
   let ambienceStarted = false;
+  let ambienceWanted = false;      /* once the site has asked for the ambience it should never stay silent */
+  let ambienceRetries = 0;
 
   Object.keys(SOUND_FILES).forEach(name => {
     const el = document.getElementById(name);
@@ -71,10 +73,33 @@ const Sound = (() => {
     Object.values(sounds).forEach(s => { s.muted = isMuted; });
   }
 
+  /* Browsers can pause a looping track behind the page's back (too many media elements, another
+     app taking the audio, a phone call, a tab that was hidden, a stalled download). Whatever the
+     reason, if the ambience is wanted and is not playing, put it back. */
+  function keepAmbience() {
+    const a = sounds.ambience;
+    if (!ambienceWanted || !a) return;
+    try {
+      if (a.ended) a.currentTime = 0;
+      if (a.error && ambienceRetries < 6) { ambienceRetries++; a.load(); }     /* a failed download: try again (a few times) */
+      if (a.paused) a.play().catch(() => {});                                  /* refused before a click: the next key or click retries */
+    } catch (e) { /* try again on the next beat */ }
+  }
+
   function startAmbience() {
-    if (ambienceStarted || !sounds.ambience) return;
+    if (!sounds.ambience) return;
+    ambienceWanted = true;
+    if (ambienceStarted) { keepAmbience(); return; }   /* already started: just make sure it is still running */
     ambienceStarted = true;
     sounds.ambience.play().catch(() => { ambienceStarted = false; });
+  }
+
+  if (sounds.ambience) {
+    ["pause", "ended", "stalled", "suspend", "error", "emptied"].forEach(ev =>
+      sounds.ambience.addEventListener(ev, () => setTimeout(keepAmbience, ev === "error" ? 2000 : 250)));
+    sounds.ambience.addEventListener("playing", () => { ambienceRetries = 0; });
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) keepAmbience(); });
+    setInterval(keepAmbience, 2000);                   /* the safety net for anything the events miss */
   }
 
   /* Compatibility with older calls (Sound.blip(freq, dur)): low pitch
