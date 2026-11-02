@@ -41,7 +41,16 @@
    into the site's normal  audio/  folder with the prefix bvs_  (e.g.
    audio/bvs_radar_ping.wav). Any file found is used in place of its stand-in; a
    missing file silently falls back. Hiding-ship chatter is voice only: no text is
-   ever shown for it. */
+   ever shown for it.
+
+   ORDER OF SOUNDS
+   Stingers and spoken lines (dispatch, system, the hiding ship) never play on top of each
+   other. They go through one cue lane in Sfx and sound strictly one after another; the
+   ambience, engine hum and hot / cold tone keep running underneath but are turned down while
+   a cue sounds. A transmitted fix plays out as: fix confirmation, launch, "vessel away",
+   approach, the hiding ship's reaction, docking, breach, credits. Each beat waits for the
+   previous sound to finish, so a longer recording just holds the sequence a little longer.
+   Instant player feedback (clicks, dial ticks, locking, pinning) stays outside the lane. */
 
 const Triangulate = (() => {
 
@@ -65,6 +74,7 @@ const Triangulate = (() => {
   const DOCK_GAP = 7;                         /* km: the supply ship parks this far from the boarding vessel at the dock */
   const VESSEL_SPEED = 34;                    /* km per second */
   const BRIEF_S = 1.7;
+  const BRIEF_WAIT_MAX = 1.5;                 /* s: the search never waits longer than this for the opening cues */
   const RESULT_S = 4.2;
   const SWEEP_DEG_S = 48;
   const BEST_KEY = "d9-bvs-best";
@@ -174,7 +184,7 @@ const Triangulate = (() => {
   /* ================= sound engine ================= */
 
   const Sfx = (() => {
-    let ctx = null, master = null, bus = null, noiseBuf = null, lastResume = 0;
+    let ctx = null, master = null, bus = null, bedM = null, bedB = null, noiseBuf = null, lastResume = 0;
     /* Recordings are decoded once into memory and played through Web Audio (no <audio> elements:
        browsers cap those, and a refused play() used to leave a loop silently dead). Opened straight
        from disk (file://) fetch is blocked, so that case keeps the old element route. */
@@ -194,6 +204,8 @@ const Triangulate = (() => {
         bus = ctx.createGain();            /* every recording goes through here: one place for MUTE */
         bus.gain.value = muted() ? 0 : 1;
         bus.connect(ctx.destination);
+        bedM = ctx.createGain(); bedM.connect(master);   /* looping beds (synthesised) and ... */
+        bedB = ctx.createGain(); bedB.connect(bus);      /* ... looping beds (recordings): turned down while a cue sounds */
       } catch (e) { ctx = null; }
       return ctx;
     }
@@ -299,7 +311,7 @@ const Triangulate = (() => {
     /* loop stand-ins: each returns { set(v), stop() } */
     function nodeLoop(build) {
       const c = ac(); if (!c) return null;
-      const g = c.createGain(); g.gain.value = 0; g.connect(master);
+      const g = c.createGain(); g.gain.value = 0; g.connect(bedM || master);
       const parts = []; const set = build(c, g, parts);
       return {
         set: set || (() => {}),
@@ -351,7 +363,7 @@ const Triangulate = (() => {
 
     const LOOP_VOL = { ambience_space_loop: 0.5, signal_tone_loop: 0.7, static_loop: 0.6, vessel_travel_loop: 0.6, fuel_warning_loop: 0.5 };
 
-    /* plays one copy of a loaded recording; true if it started */
+    /* plays one copy of a loaded recording; returns a handle ({ stop }) if it started, else false */
     function fileOnce(f, vol) {
       try {
         if (f.buf && ctx && bus) {
@@ -360,9 +372,9 @@ const Triangulate = (() => {
           src.connect(g); g.connect(bus);
           src.onended = () => { try { src.disconnect(); g.disconnect(); } catch (e) {} };
           src.start();
-          return true;
+          return { stop() { try { src.stop(); } catch (e) {} } };
         }
-        if (f.el) { const a = f.el.cloneNode(); a.volume = vol; a.play().catch(() => {}); return true; }
+        if (f.el) { const a = f.el.cloneNode(); a.volume = vol; a.play().catch(() => {}); return { stop() { try { a.pause(); } catch (e) {} } }; }
       } catch (e) { /* fall through to the stand-in */ }
       return false;
     }
@@ -386,7 +398,7 @@ const Triangulate = (() => {
         const src = ctx.createBufferSource(), g = ctx.createGain();
         src.buffer = f.buf; src.loop = true;
         g.gain.value = fixed ? base * 0.5 : 0;
-        src.connect(g); g.connect(bus); src.start();
+        src.connect(g); g.connect(bedB || bus); src.start();
         const h = { file: true, base, fixed, src, g };
         h.set = v => {
           const t = ctx.currentTime;
@@ -443,23 +455,113 @@ const Triangulate = (() => {
       const h = loops[name];
       if (h) { try { h.stop(); } catch (e) {} delete loops[name]; }
     }
-    function stopAll() { Object.keys(loops).forEach(loopStop); }
+    function stopAll() { flush(); Object.keys(loops).forEach(loopStop); }
 
-    function voice(name, standIn) {
-      if (muted()) return;
-      resume();
-      const f = probe(name);
-      if (f.ok && fileOnce(f, 0.9)) return;
-      if (f.ok === null) {
-        /* still loading: say it as soon as it is in, if that is soon enough to still make sense */
-        const t0 = Date.now();
-        f.wait.push(() => {
-          if (muted() || Date.now() - t0 > 4000) return;
-          if (!(f.ok && fileOnce(f, 0.9)) && standIn && SYN[standIn]) SYN[standIn]();
-        });
-        return;
+    /* ---- the cue lane ----
+       Everything the game announces (stingers, dispatch and system lines, the hiding ship's
+       voice) goes through ONE lane, so those sounds play one after another and never on top of
+       each other. A cue lasts as long as its recording (or its stand-in), then a short gap;
+       busy() tells the game whether the lane is still sounding or has cues waiting, and the
+       flight / result sequencing waits on it, so the picture follows the audio. While the lane
+       is sounding the looping beds are turned down (duck). Player feedback (ui_click, dial_tick,
+       lock_engage, marker_place, bearing_clear) is instant and stays outside the lane. */
+    const LANE_GAP = 0.16;          /* s of silence after a cue */
+    const LANE_WAITING_MAX = 2;     /* a droppable cue is skipped when this many are already waiting */
+    const CUE_MAX = 10;             /* s: no single cue holds the lane longer than this */
+    const DUCK_TO = 0.3;            /* level of the looping beds while a cue sounds */
+    /* how long each built-in stand-in lasts (s); recordings use their own length */
+    const SYN_DUR = {
+      ui_click: 0.03, dial_tick: 0.02, radar_ping: 0.7, lock_engage: 0.2, marker_place: 0.06, credits_earned: 0.22,
+      depot_open: 0.25, resupply_confirm: 0.6, chatter: 0.6, bearing_clear: 0.2, node_online: 0.09, contract_assigned: 0.21,
+      shift_start: 0.75, transmit_send: 0.5, vessel_launch: 0.95, vessel_dock: 0.42, breach_success: 0.85, vessel_recall: 0.55,
+      shift_over: 1.55, new_best_shift: 0.4
+    };
+    const lane = { q: [], cur: null, gap: null };
+
+    function busy() { return !!lane.cur || lane.gap !== null || lane.q.length > 0; }
+
+    function duck(on) {
+      if (!ctx) return;
+      const t = ctx.currentTime, v = on ? DUCK_TO : 1;
+      [bedM, bedB].forEach(n => { if (n) { try { n.gain.setTargetAtTime(v, t, on ? 0.04 : 0.3); } catch (e) {} } });
+    }
+
+    function fileLength(f) {
+      if (f.buf) return f.buf.duration;
+      return f.el && isFinite(f.el.duration) && f.el.duration > 0 ? f.el.duration : 1.2;
+    }
+
+    /* starts the sound of one cue; returns how long it lasts (s), 0 if there is nothing to play */
+    function playCue(it) {
+      const o = it.o, f = probe(it.name);
+      const vol = clamp(o.volume || (o.voice ? 0.9 : 0.8), 0, 1);
+      if (f.ok) {
+        const h = fileOnce(f, vol);
+        if (h) { it.h = h; return fileLength(f); }
       }
-      if (standIn && SYN[standIn]) SYN[standIn]();
+      const syn = o.standIn || (SYN[it.name] ? it.name : null);
+      if (syn && SYN[syn]) { SYN[syn](o.arg); return SYN_DUR[syn] || 0.4; }
+      return 0;
+    }
+
+    function endCue(it) {
+      if (lane.cur !== it) return;
+      clearTimeout(it.end); clearTimeout(it.wd); clearTimeout(it.lead);
+      lane.cur = null;
+      lane.gap = setTimeout(() => {
+        lane.gap = null;
+        if (lane.q.length) pump(); else duck(false);
+      }, (it.o.gap !== undefined ? it.o.gap : LANE_GAP) * 1000);
+    }
+
+    function pump() {
+      if (lane.cur || lane.gap !== null || !lane.q.length) return;
+      const it = lane.q.shift();
+      lane.cur = it;
+      it.go = () => {
+        if (it.started || lane.cur !== it) return;
+        it.started = true;
+        clearTimeout(it.wd);
+        if (it.o.onStart) { try { it.o.onStart(); } catch (e) {} }
+        if (muted()) { endCue(it); return; }
+        resume();
+        let dur = 0;
+        try { dur = playCue(it); } catch (e) { dur = 0; }
+        duck(true);
+        it.end = setTimeout(() => endCue(it), clamp(dur, 0, CUE_MAX) * 1000);
+      };
+      const begin = () => {
+        if (lane.cur !== it) return;
+        const f = probe(it.name);
+        if (f.ok === null) { f.wait.push(it.go); it.wd = setTimeout(it.go, 1500); }   /* answer not in yet: give the file a moment */
+        else it.go();
+      };
+      if (it.o.lead) it.lead = setTimeout(begin, it.o.lead * 1000); else begin();
+    }
+
+    /* queue a cue. o: { voice, standIn, volume, gap (s after it), lead (s before it), drop, onStart }.
+       drop = skip it when the lane already has cues waiting (chatter must never pile up).
+       Returns false when it was not queued (muted or dropped); the caller then skips the wait. */
+    function cue(name, o) {
+      o = o || {};
+      if (muted()) return false;
+      if (o.drop && lane.q.length >= LANE_WAITING_MAX) return false;
+      lane.q.push({ name, o });
+      pump();
+      return true;
+    }
+
+    /* drop everything queued and cut what is sounding (a new shift, skipping ahead, closing) */
+    function flush() {
+      lane.q.length = 0;
+      const it = lane.cur;
+      if (it) {
+        clearTimeout(it.end); clearTimeout(it.wd); clearTimeout(it.lead);
+        if (it.h) { try { it.h.stop(); } catch (e) {} }
+      }
+      lane.cur = null;
+      clearTimeout(lane.gap); lane.gap = null;
+      duck(false);
     }
 
     /* Choose which line of a set to play, from the files that actually exist:
@@ -508,7 +610,7 @@ const Triangulate = (() => {
       }) };
     }
 
-    return { play, loopStart, loopSet, loopStop, stopAll, voice, pick, preload, report, resume, sync, peek };
+    return { play, cue, busy, flush, loopStart, loopSet, loopStop, stopAll, pick, preload, report, resume, sync, peek };
   })();
 
   /* ================= state ================= */
@@ -808,8 +910,8 @@ const Triangulate = (() => {
     Sfx.loopStop("signal_tone_loop"); Sfx.loopStop("static_loop");
     Sfx.loopStop("fuel_warning_loop"); Sfx.loopStop("vessel_travel_loop");
     const s = G.shift;
-    Sfx.play("shift_over");
-    if (s.newBest) setTimeout(() => G && Sfx.play("new_best_shift"), 1500);
+    Sfx.cue("shift_over");
+    if (s.newBest) Sfx.cue("new_best_shift");
     screen(`
       <div class="scr-head">SHIFT TERMINATED</div>
       <div class="scr-title bad">FUEL RESERVE DEPLETED</div>
@@ -853,7 +955,7 @@ const Triangulate = (() => {
     hideToast();
     hideOffer();
     Sfx.loopStop("signal_tone_loop"); Sfx.loopStop("static_loop"); Sfx.loopStop("fuel_warning_loop");
-    Sfx.play("vessel_launch");
+    Sfx.cue("vessel_launch");
     Sfx.loopStart("vessel_travel_loop");
     say("dispatch_on_approach", "Supply ship inbound. Docking with the boarding vessel.", "DISPATCH");
     renderHUD();
@@ -891,7 +993,7 @@ const Triangulate = (() => {
     s.credits -= d.cost;                                       /* the listed price comes off in full */
     s.resupplies++;                                            /* the NEXT resupply costs DEPOT_STEP more */
     s.fuel = Math.min(START_FUEL, Math.max(0, s.fuel) + d.gain);
-    Sfx.play("resupply_confirm");
+    Sfx.cue("resupply_confirm");
     hideOffer();
     d.phase = "fuel"; d.t = 1.1; d.next = "next";
     toast(`<div class="t-head">REFUELLING</div><div class="t-sub">+${d.gain} FUEL &middot; -${fmtN(d.cost)} CREDITS</div>`);
@@ -915,14 +1017,14 @@ const Triangulate = (() => {
       if (moveVessel(d, d.park, SUPPLY_SPEED, dt)) {
         d.phase = "docked";
         Sfx.loopStop("vessel_travel_loop");
-        Sfx.play("vessel_dock");
-        Sfx.play("depot_open");
+        Sfx.cue("vessel_dock");
+        Sfx.cue("depot_open");
         showOffer();
         updateSide();
       }
     } else if (d.phase === "fuel") {
       d.t -= dt;
-      if (d.t <= 0) { hideToast(); d.phase = "out"; Sfx.loopStart("vessel_travel_loop"); }
+      if (d.t <= 0 && !Sfx.busy()) { hideToast(); d.phase = "out"; Sfx.loopStart("vessel_travel_loop"); }
     } else if (d.phase === "out") {
       if (moveVessel(d, d.corner, SUPPLY_SPEED * 1.2, dt)) {
         Sfx.loopStop("vessel_travel_loop");
@@ -942,7 +1044,8 @@ const Triangulate = (() => {
     G.depotPending = false;
     hideOffer();
     hideScreen();
-    Sfx.play("shift_start");
+    Sfx.flush();
+    Sfx.cue("shift_start");
     renderHUD();
     nextContract();
   }
@@ -965,11 +1068,11 @@ const Triangulate = (() => {
   function introContract() {
     G.state = "BRIEF";
     G.timer = BRIEF_S;
-    Sfx.play("contract_assigned");
+    Sfx.cue("contract_assigned");
     toast(`<div class="t-head">CONTRACT ASSIGNED</div><div class="t-big">${G.contract.id}</div>
            <div class="t-sub">PRIORITY: ${G.contract.priority}</div><div class="t-sub">ONE VESSEL, HIDING. LOCATE AND TRANSMIT.</div>`);
-    G.contract.nodes.forEach((nd, i) => setTimeout(() => G && Sfx.play("node_online"), 200 + i * 160));
-    setTimeout(() => G && say("sys_node_online", SYS.sys_node_online, "SYSTEM"), 700);
+    G.contract.nodes.forEach(() => Sfx.cue("node_online", { gap: 0.06 }));
+    say("sys_node_online", SYS.sys_node_online, "SYSTEM", { drop: false });
     updateSide();
     renderHUD();
   }
@@ -1019,8 +1122,8 @@ const Triangulate = (() => {
     tap("lock");
     const cone = coneFor(G.contract.n);
     nd.wedge = cone > 0 ? cone * (1 + (1 - s) * 0.5) : 0;          /* a bare line at the climax */
-    Sfx.play("lock_engage");
-    say("sys_bearing_locked", SYS.sys_bearing_locked, "SYSTEM");
+    Sfx.play("lock_engage");                                       /* instant feedback; the spoken line follows it */
+    say("sys_bearing_locked", SYS.sys_bearing_locked, "SYSTEM", { lead: 0.28 });
     updateSide();
     return true;
   }
@@ -1073,7 +1176,9 @@ const Triangulate = (() => {
     G.state = "FLIGHT";
     tap("transmit");
     Sfx.loopStop("signal_tone_loop"); Sfx.loopStop("static_loop");
-    Sfx.play("transmit_send");
+    Sfx.loopStop("fuel_warning_loop");                             /* nothing but the sequence below until the result */
+    Sfx.flush();                                                   /* start the sequence on a clean lane */
+    Sfx.cue("transmit_send");
     say("dispatch_fix_received", DISPATCH.dispatch_fix_received, "DISPATCH");
     G.flight = { outcome, err, phase: "wait", t: 1.1, x: c.dock.x, y: c.dock.y, locks: lockedCount(), said: {} };
     updateSide();
@@ -1091,35 +1196,50 @@ const Triangulate = (() => {
     return false;
   }
 
+  /* One beat at a time. Every beat that makes a sound queues it in the cue lane and the next
+     beat only begins once the lane has gone quiet:
+       fix confirmation > launch > "vessel away" > approach > the hiding ship's reaction >
+       docking > breach > credits (a miss: ... > recall).
+     The timers are minimum beats; a long recording simply holds the sequence until it is over. */
   function stepFlight(dt) {
     const f = G.flight, c = G.contract;
     f.t -= dt;
+    const free = !Sfx.busy();                 /* nothing still sounding or waiting its turn */
     if (f.phase === "wait") {
-      if (f.t <= 0) {
+      if (f.t <= 0 && free) {
         f.phase = "out";
-        Sfx.play("vessel_launch");
-        Sfx.loopStart("vessel_travel_loop");
+        Sfx.cue("vessel_launch");
         say("dispatch_vessel_away", DISPATCH.dispatch_vessel_away, "DISPATCH");
+        Sfx.loopStart("vessel_travel_loop");
       }
     } else if (f.phase === "out") {
       if (!f.said.appr && dist(f, c.marker) < 20) { f.said.appr = 1; say("dispatch_on_approach", DISPATCH.dispatch_on_approach, "DISPATCH"); }
       if (moveVessel(f, c.marker, VESSEL_SPEED, dt)) {
-        if (f.outcome === "clean") { f.phase = "found"; f.t = 0.7; foundShip(); }
-        else if (f.outcome === "near") { f.phase = "correct"; f.t = 0; toast(`<div class="t-head">WITHIN TOLERANCE</div><div class="t-sub">VESSEL CORRECTING COURSE.</div>`); }
-        else { f.phase = "hold"; f.t = 1.0; toast(`<div class="t-head">NO CONTACT AT COORDINATES</div><div class="t-sub">SCANNING...</div>`); }
+        if (f.outcome !== "near") Sfx.loopStop("vessel_travel_loop");   /* at the pin the engines stop (a near miss keeps flying) */
+        if (free) {                                                      /* it waits there until the lines before have finished */
+          if (f.outcome === "clean") { f.phase = "found"; f.t = 0.7; foundShip(); }
+          else if (f.outcome === "near") { f.phase = "correct"; f.t = 0; toast(`<div class="t-head">WITHIN TOLERANCE</div><div class="t-sub">VESSEL CORRECTING COURSE.</div>`); }
+          else { f.phase = "hold"; f.t = 1.0; toast(`<div class="t-head">NO CONTACT AT COORDINATES</div><div class="t-sub">SCANNING...</div>`); }
+        }
       }
     } else if (f.phase === "correct") {
-      if (moveVessel(f, c.target, VESSEL_SPEED * 0.55, dt)) { f.phase = "found"; f.t = 0.7; foundShip(); }
+      if (moveVessel(f, c.target, VESSEL_SPEED * 0.55, dt)) {
+        Sfx.loopStop("vessel_travel_loop");
+        if (free) { f.phase = "found"; f.t = 0.7; foundShip(); }
+      }
     } else if (f.phase === "found") {
-      if (f.t <= 0) { f.phase = "dock"; f.t = 1.0; Sfx.play("vessel_dock"); say("dispatch_docked", DISPATCH.dispatch_docked, "DISPATCH"); }
+      if (f.t <= 0 && free) { f.phase = "dock"; f.t = 1.0; Sfx.cue("vessel_dock"); say("dispatch_docked", DISPATCH.dispatch_docked, "DISPATCH"); }
     } else if (f.phase === "dock") {
-      if (f.t <= 0) { f.phase = "breach"; f.t = 0.9; Sfx.loopStop("vessel_travel_loop"); Sfx.play("breach_success"); say("dispatch_breach_confirmed", DISPATCH.dispatch_breach_confirmed, "DISPATCH"); }
+      if (f.t <= 0 && free) { f.phase = "breach"; f.t = 0.9; Sfx.cue("breach_success"); say("dispatch_breach_confirmed", DISPATCH.dispatch_breach_confirmed, "DISPATCH"); }
     } else if (f.phase === "breach") {
-      if (f.t <= 0) finishContract();
+      if (f.t <= 0 && free) finishContract();
     } else if (f.phase === "hold") {
-      if (f.t <= 0) { f.phase = "return"; Sfx.play("vessel_recall"); }
+      if (f.t <= 0 && free) { f.phase = "return"; Sfx.cue("vessel_recall"); Sfx.loopStart("vessel_travel_loop"); }
     } else if (f.phase === "return") {
-      if (moveVessel(f, c.dock, VESSEL_SPEED * 1.2, dt)) { Sfx.loopStop("vessel_travel_loop"); finishContract(); }
+      if (moveVessel(f, c.dock, VESSEL_SPEED * 1.2, dt)) {
+        Sfx.loopStop("vessel_travel_loop");
+        if (free) finishContract();
+      }
     }
   }
 
@@ -1169,7 +1289,7 @@ const Triangulate = (() => {
     }
     s.value += pts;
     s.credits += cr; s.earned += cr;
-    if (cr) setTimeout(() => G && Sfx.play("credits_earned"), 700);
+    if (cr) Sfx.cue("credits_earned");
     if (s.value > G.best.value) {
       G.best = { value: s.value, breaches: s.breaches, clean: s.clean, rating: ratingFor(s.value) };
       saveBest(G.best);
@@ -1199,21 +1319,35 @@ const Triangulate = (() => {
 
   /* ================= voices / comms ================= */
 
-  function say(file, text, label) {
+  /* A spoken line: it goes in the cue lane and is heard in its turn; the comms strip changes at
+     the moment it starts. o: { drop (skip it if lines are already waiting), lead (s before it) }.
+     System lines are droppable by default so they never pile up. */
+  function say(file, text, label, o) {
     if (!G) return;
-    if (label === "INTERCEPT") {                          /* ship chatter: sound only, no words */
-      G.R.commtext.innerHTML = `<b>INTERCEPT</b> &rsaquo; <span class="dim">VOICE TRAFFIC &middot; AUDIO ONLY</span>`;
-      G.R.comm.classList.add("intercept");
-      Sfx.voice(file, "chatter");
-      return;
-    }
-    G.R.commtext.innerHTML = `<b>${label}</b> &rsaquo; ${text}`;
-    G.R.comm.classList.remove("intercept");
-    Sfx.voice(file);
+    o = o || {};
+    const chatter = label === "INTERCEPT";                 /* ship chatter: sound only, no words */
+    const show = () => {
+      if (!G) return;
+      if (chatter) {
+        G.R.commtext.innerHTML = `<b>INTERCEPT</b> &rsaquo; <span class="dim">VOICE TRAFFIC &middot; AUDIO ONLY</span>`;
+        G.R.comm.classList.add("intercept");
+      } else {
+        G.R.commtext.innerHTML = `<b>${label}</b> &rsaquo; ${text}`;
+        G.R.comm.classList.remove("intercept");
+      }
+    };
+    const queued = Sfx.cue(file, {
+      voice: true,
+      standIn: chatter ? "chatter" : undefined,
+      drop: o.drop !== undefined ? o.drop : label === "SYSTEM",
+      lead: o.lead || 0,
+      onStart: show
+    });
+    if (!queued) show();                                   /* muted or dropped: just update the strip */
   }
 
   function intercept() {
-    say(voiceFor(["pilot", "comms", "crew"]), "", "INTERCEPT");
+    say(voiceFor(["pilot", "comms", "crew"]), "", "INTERCEPT", { drop: true });
   }
 
   /* ================= HUD / side panel ================= */
@@ -1228,8 +1362,17 @@ const Triangulate = (() => {
     R.value.textContent = fmtN(s.value);
     R.best.textContent = fmtN(G.best.value);
     R.breaches.textContent = s.breaches;
-    if (s.fuel <= 25 && s.fuel > 0 && (G.state === "SEARCH" || G.state === "BRIEF" || G.state === "RESULT")) Sfx.loopStart("fuel_warning_loop");
-    else Sfx.loopStop("fuel_warning_loop");
+    syncAlarm();
+  }
+
+  /* The low-fuel pulse is a background alarm. While the player is searching it never goes quiet;
+     at the start of a contract and on the result screen it waits for the cue lane to be silent,
+     so it never talks over the opening cues, the result or the credits. */
+  function syncAlarm() {
+    if (!G) return;
+    const low = G.shift.fuel <= 25 && G.shift.fuel > 0, st = G.state;
+    const want = low && (st === "SEARCH" || ((st === "BRIEF" || st === "RESULT") && !Sfx.busy()));
+    if (want) Sfx.loopStart("fuel_warning_loop"); else Sfx.loopStop("fuel_warning_loop");
   }
 
   function updateSide() {
@@ -1467,13 +1610,13 @@ const Triangulate = (() => {
     Sfx.sync();
     const prev = G.sweep;
     G.sweep = (G.sweep + SWEEP_DEG_S * dt) % 360;
-    if (G.sweep < prev && G.state !== "MENU") Sfx.play("radar_ping");
+    if (G.sweep < prev && (G.state === "SEARCH" || G.state === "BRIEF") && !Sfx.busy()) Sfx.play("radar_ping");   /* never over a cue */
 
     if (G.toastT > 0) { G.toastT -= dt; }
 
     if (G.state === "BRIEF") {
       G.timer -= dt;
-      if (G.timer <= 0) beginSearch();
+      if (G.timer <= 0 && (!Sfx.busy() || G.timer < -BRIEF_WAIT_MAX)) beginSearch();      /* let the opening cues finish (but not forever) */
     }
     else if (G.state === "SEARCH") {
       const c = G.contract;
@@ -1508,6 +1651,7 @@ const Triangulate = (() => {
       G.R.sig.textContent = "--%"; G.R.sigbar.style.width = "0%";
     }
 
+    syncAlarm();
     drawRadar();
     drawScope();
   }
@@ -1536,16 +1680,19 @@ const Triangulate = (() => {
 
   function skip() {
     if (!G) return false;
-    if (G.state === "RESULT") { afterResult(); return true; }
-    if (G.state === "BRIEF") { beginSearch(); return true; }
+    if (G.state === "RESULT") { Sfx.flush(); afterResult(); return true; }
+    if (G.state === "BRIEF") { Sfx.flush(); beginSearch(); return true; }
     return false;
   }
+
+  /* these buttons already make their own sound: no extra click on top */
+  const OWN_SOUND = { lock: 1, reset: 1, transmit: 1, resupply: 1, start: 1 };
 
   function wire() {
     const R = G.R;
     R.root.addEventListener("click", e => {
       const b = e.target.closest("[data-a]");
-      if (b && !b.disabled) { Sfx.play("ui_click"); act(b.dataset.a); }
+      if (b && !b.disabled) { if (!OWN_SOUND[b.dataset.a]) Sfx.play("ui_click"); act(b.dataset.a); }
       else if (e.target.closest(".tri-toast.on")) skip();
     });
 
@@ -1642,7 +1789,7 @@ const Triangulate = (() => {
   /* exported for tests */
   const _test = {
     makeContract, lobe, nodeSignal, bearingTo, pointAt, angDiff, ratingFor,
-    get G() { return G; }, tolClean, tolNear, coneFor, edgeDock, markerSignal, DEPOT_COST, DEPOT_FUEL, depotCostFor, creditScale, finishContract, newShift
+    get G() { return G; }, tolClean, tolNear, coneFor, edgeDock, markerSignal, DEPOT_COST, DEPOT_FUEL, depotCostFor, creditScale, finishContract, newShift, Sfx
   };
 
   /* console helper: Triangulate.sounds() lists every sound file and whether the game found it */
