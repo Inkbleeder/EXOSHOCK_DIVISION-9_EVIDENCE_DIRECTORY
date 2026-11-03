@@ -74,6 +74,7 @@ const Triangulate = (() => {
   const MIN_SUPPLY_S = 3.6;                   /* s: the shortest the supply ship's trip in or out ever takes */
   const DOCK_GAP = 7;                         /* km: the supply ship parks this far from the boarding vessel at the dock */
   const VESSEL_SPEED = 17;                    /* km per second (top speed; short hops are slowed to MIN_FLIGHT_S) */
+  const VESSEL_MAX = 30;                      /* km per second: the fastest the synced flight may ever go */
   const MIN_FLIGHT_S = 4.2;                   /* s: the shortest the outbound flight ever takes, so the travel sound is heard */
   const GUARD_S = 12;                         /* s: a step waiting on its sound moves on anyway after this long */
   const BRIEF_S = 1.7;
@@ -537,6 +538,7 @@ const Triangulate = (() => {
         resume();
         let dur = 0;
         try { dur = playCue(it); } catch (e) { dur = 0; }
+        it.t0 = Date.now(); it.dur = clamp(dur, 0, CUE_MAX);
         duck(true);
         it.end = setTimeout(() => endCue(it), clamp(dur, 0, CUE_MAX) * 1000);
       };
@@ -547,6 +549,27 @@ const Triangulate = (() => {
         else it.go();
       };
       if (it.o.lead) it.lead = setTimeout(begin, it.o.lead * 1000); else begin();
+    }
+
+    /* how long a cue will sound (s): its recording, else its stand-in */
+    function estDur(it) {
+      const f = probe(it.name), o = it.o;
+      if (f.ok === true) return clamp(fileLength(f), 0, CUE_MAX);
+      const syn = o.standIn || (SYN[it.name] ? it.name : null);
+      if (syn && SYN_DUR[syn]) return SYN_DUR[syn];
+      return f.ok === null ? 1.2 : 0;
+    }
+
+    /* seconds of announced sound still to come: what is sounding now plus everything queued.
+       The vessel's flight uses this to arrive exactly when its lines have finished. */
+    function remaining() {
+      if (muted()) return 0;
+      let t = 0;
+      const cur = lane.cur;
+      if (cur) t += cur.t0 ? Math.max(0, (cur.t0 + cur.dur * 1000 - Date.now()) / 1000) : estDur(cur) + (cur.o.lead || 0);
+      else if (lane.gap !== null) t += LANE_GAP;
+      lane.q.forEach(it => { t += (it.o.lead || 0) + estDur(it) + (it.o.gap !== undefined ? it.o.gap : LANE_GAP); });
+      return t;
     }
 
     /* queue a cue. o: { voice, standIn, volume, gap (s after it), lead (s before it), drop, onStart }.
@@ -620,7 +643,7 @@ const Triangulate = (() => {
       }) };
     }
 
-    return { play, cue, busy, flush, loopStart, loopSet, loopStop, stopAll, pick, preload, report, resume, sync, peek };
+    return { play, cue, busy, remaining, flush, loopStart, loopSet, loopStop, stopAll, pick, preload, report, resume, sync, peek };
   })();
 
   /* ================= state ================= */
@@ -976,7 +999,7 @@ const Triangulate = (() => {
     cueThen("vessel_launch", {}, () => {
       if (!G || G.depot !== d || d.phase !== "launching") return;
       d.phase = "in";
-      startLeg(d, d.park, SUPPLY_SPEED, MIN_SUPPLY_S);
+      startLeg(d, d.park, SUPPLY_SPEED * 2, MIN_SUPPLY_S, true);
       Sfx.loopStart("vessel_travel_loop");
     });
     say("dispatch_on_approach", "Supply ship inbound. Docking with the boarding vessel.", "DISPATCH");
@@ -1038,7 +1061,7 @@ const Triangulate = (() => {
     const d = G.depot;
     if (!d) return;
     if (d.phase === "in") {
-      if (moveVessel(d, d.park, d.speed, dt)) {
+      if (stepLeg(d, d.park, dt)) {
         d.phase = "docking";
         Sfx.loopStop("vessel_travel_loop");
       }
@@ -1239,8 +1262,21 @@ const Triangulate = (() => {
 
   /* One leg of a trip: top speed, but never shorter than `minS` seconds, so even a short hop
      lasts long enough for its sound to be heard. */
-  function startLeg(f, to, topSpeed, minS) {
+  function startLeg(f, to, topSpeed, minS, sync) {
+    f.top = topSpeed; f.minS = minS; f.el = 0; f.sync = !!sync;
     f.speed = Math.min(topSpeed, Math.max(dist(f, to), 0.01) / minS);
+  }
+
+  /* Advance a leg one frame. A synced leg re-aims its speed every frame so that it ARRIVES when the
+     lines queued behind it (launch, "vessel away", "on approach") have finished: it is still
+     travelling while they play, never parked waiting for them. */
+  function stepLeg(f, to, dt) {
+    f.el += dt;
+    if (f.sync) {
+      const rem = Math.max(Sfx.remaining(), f.minS - f.el, 0.4);
+      f.speed = Math.min(f.top, dist(f, to) / rem);
+    }
+    return moveVessel(f, to, f.speed, dt);
   }
 
   /* Queue a cue and run `fn` at the moment its sound STARTS, so the picture changes with the audio.
@@ -1271,14 +1307,14 @@ const Triangulate = (() => {
         cueThen("vessel_launch", {}, () => {
           if (G.flight !== f || f.phase !== "launching") return;
           f.phase = "out";
-          startLeg(f, c.marker, VESSEL_SPEED, MIN_FLIGHT_S);
+          startLeg(f, c.marker, VESSEL_MAX, MIN_FLIGHT_S, true);
           Sfx.loopStart("vessel_travel_loop");
           say("dispatch_vessel_away", DISPATCH.dispatch_vessel_away, "DISPATCH");
+          say("dispatch_on_approach", DISPATCH.dispatch_on_approach, "DISPATCH");   /* queued now: plays right after, mid-flight */
         });
       }
     } else if (f.phase === "out") {
-      if (!f.said.appr && dist(f, c.marker) / f.speed < 1.8) { f.said.appr = 1; say("dispatch_on_approach", DISPATCH.dispatch_on_approach, "DISPATCH"); }
-      if (moveVessel(f, c.marker, f.speed, dt)) {
+      if (stepLeg(f, c.marker, dt)) {
         Sfx.loopStop("vessel_travel_loop");
         f.phase = "arrived"; f.t = 0.3;
       }
