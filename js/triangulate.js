@@ -75,6 +75,8 @@ const Triangulate = (() => {
   const DOCK_GAP = 7;                         /* km: the supply ship parks this far from the boarding vessel at the dock */
   const VESSEL_SPEED = 17;                    /* km per second (top speed; short hops are slowed to MIN_FLIGHT_S) */
   const VESSEL_MAX = 30;                      /* km per second: the fastest the synced flight may ever go */
+  const MAX_FLIGHT_S = 6;                     /* s: a synced outbound flight never takes longer than this, however long the lines are */
+  const MAX_SUPPLY_S = 5;                     /* s: same cap for the supply ship's trip in */
   const MIN_FLIGHT_S = 4.2;                   /* s: the shortest the outbound flight ever takes, so the travel sound is heard */
   const GUARD_S = 12;                         /* s: a step waiting on its sound moves on anyway after this long */
   const BRIEF_S = 1.7;
@@ -999,7 +1001,7 @@ const Triangulate = (() => {
     cueThen("vessel_launch", {}, () => {
       if (!G || G.depot !== d || d.phase !== "launching") return;
       d.phase = "in";
-      startLeg(d, d.park, SUPPLY_SPEED * 2, MIN_SUPPLY_S, true);
+      startLeg(d, d.park, SUPPLY_SPEED * 2, MIN_SUPPLY_S, true, MAX_SUPPLY_S);
       Sfx.loopStart("vessel_travel_loop");
     });
     say("dispatch_on_approach", "Supply ship inbound. Docking with the boarding vessel.", "DISPATCH");
@@ -1262,8 +1264,8 @@ const Triangulate = (() => {
 
   /* One leg of a trip: top speed, but never shorter than `minS` seconds, so even a short hop
      lasts long enough for its sound to be heard. */
-  function startLeg(f, to, topSpeed, minS, sync) {
-    f.top = topSpeed; f.minS = minS; f.el = 0; f.sync = !!sync;
+  function startLeg(f, to, topSpeed, minS, sync, maxS) {
+    f.top = topSpeed; f.minS = minS; f.maxS = maxS || 99; f.el = 0; f.sync = !!sync;
     f.speed = Math.min(topSpeed, Math.max(dist(f, to), 0.01) / minS);
   }
 
@@ -1273,7 +1275,7 @@ const Triangulate = (() => {
   function stepLeg(f, to, dt) {
     f.el += dt;
     if (f.sync) {
-      const rem = Math.max(Sfx.remaining(), f.minS - f.el, 0.4);
+      const rem = Math.max(Math.min(Sfx.remaining(), f.maxS - f.el), f.minS - f.el, 0.4);
       f.speed = Math.min(f.top, dist(f, to) / rem);
     }
     return moveVessel(f, to, f.speed, dt);
@@ -1307,7 +1309,7 @@ const Triangulate = (() => {
         cueThen("vessel_launch", {}, () => {
           if (G.flight !== f || f.phase !== "launching") return;
           f.phase = "out";
-          startLeg(f, c.marker, VESSEL_MAX, MIN_FLIGHT_S, true);
+          startLeg(f, c.marker, VESSEL_MAX, MIN_FLIGHT_S, true, MAX_FLIGHT_S);
           Sfx.loopStart("vessel_travel_loop");
           say("dispatch_vessel_away", DISPATCH.dispatch_vessel_away, "DISPATCH");
           say("dispatch_on_approach", DISPATCH.dispatch_on_approach, "DISPATCH");   /* queued now: plays right after, mid-flight */
