@@ -77,6 +77,7 @@ const Triangulate = (() => {
   const VESSEL_MAX = 30;                      /* km per second: the fastest the synced flight may ever go */
   const MAX_FLIGHT_S = 6;                     /* s: a synced outbound flight never takes longer than this, however long the lines are */
   const MAX_SUPPLY_S = 5;                     /* s: same cap for the supply ship's trip in */
+  const MIN_LEG_SPEED = 5;                    /* km per second: slowest a synced leg ever moves, so it always reaches its goal */
   const MIN_FLIGHT_S = 4.2;                   /* s: the shortest the outbound flight ever takes, so the travel sound is heard */
   const GUARD_S = 12;                         /* s: a step waiting on its sound moves on anyway after this long */
   const BRIEF_S = 1.7;
@@ -1276,7 +1277,7 @@ const Triangulate = (() => {
     f.el += dt;
     if (f.sync) {
       const rem = Math.max(Math.min(Sfx.remaining(), f.maxS - f.el), f.minS - f.el, 0.4);
-      f.speed = Math.min(f.top, dist(f, to) / rem);
+      f.speed = Math.min(f.top, Math.max(dist(f, to) / rem, MIN_LEG_SPEED));   /* the floor makes sure it really arrives instead of creeping in forever */
     }
     return moveVessel(f, to, f.speed, dt);
   }
