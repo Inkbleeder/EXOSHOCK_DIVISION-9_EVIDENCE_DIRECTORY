@@ -77,6 +77,8 @@ const Triangulate = (() => {
   const VESSEL_MAX = 30;                      /* km per second: the fastest the synced flight may ever go */
   const MAX_FLIGHT_S = 6;                     /* s: a synced outbound flight never takes longer than this, however long the lines are */
   const MAX_SUPPLY_S = 5;                     /* s: same cap for the supply ship's trip in */
+  const CRUISE_S = 5;                         /* s: a typical outbound flight; speed = distance / this ... */
+  const CRUISE_MIN = 5, CRUISE_MAX = 26;      /* ... kept between these, then held constant for the whole leg */
   const MIN_LEG_SPEED = 5;                    /* km per second: slowest a synced leg ever moves, so it always reaches its goal */
   const MIN_FLIGHT_S = 4.2;                   /* s: the shortest the outbound flight ever takes, so the travel sound is heard */
   const GUARD_S = 12;                         /* s: a step waiting on its sound moves on anyway after this long */
@@ -575,6 +577,19 @@ const Triangulate = (() => {
       return t;
     }
 
+    /* length (s) a named cue would sound, so the game can place it by distance */
+    function estimate(name, standIn) { return estDur({ name, o: { standIn } }); }
+
+    /* cut off spoken lines: drop the ones waiting and stop the one sounding (stingers are left alone) */
+    function cutVoices() {
+      lane.q = lane.q.filter(it => !it.o.voice);
+      const it = lane.cur;
+      if (it && it.o.voice) {
+        if (it.h) { try { it.h.stop(); } catch (e) {} }
+        endCue(it);
+      }
+    }
+
     /* queue a cue. o: { voice, standIn, volume, gap (s after it), lead (s before it), drop, onStart }.
        drop = skip it when the lane already has cues waiting (chatter must never pile up).
        Returns false when it was not queued (muted or dropped); the caller then skips the wait. */
@@ -646,7 +661,7 @@ const Triangulate = (() => {
       }) };
     }
 
-    return { play, cue, busy, remaining, flush, loopStart, loopSet, loopStop, stopAll, pick, preload, report, resume, sync, peek };
+    return { play, cue, busy, remaining, estimate, cutVoices, flush, loopStart, loopSet, loopStop, stopAll, pick, preload, report, resume, sync, peek };
   })();
 
   /* ================= state ================= */
@@ -1002,7 +1017,7 @@ const Triangulate = (() => {
     cueThen("vessel_launch", {}, () => {
       if (!G || G.depot !== d || d.phase !== "launching") return;
       d.phase = "in";
-      startLeg(d, d.park, SUPPLY_SPEED * 2, MIN_SUPPLY_S, true, MAX_SUPPLY_S);
+      startLeg(d, d.park, SUPPLY_SPEED * 1.4, MIN_SUPPLY_S, false);
       Sfx.loopStart("vessel_travel_loop");
     });
     say("dispatch_on_approach", "Supply ship inbound. Docking with the boarding vessel.", "DISPATCH");
@@ -1310,14 +1325,25 @@ const Triangulate = (() => {
         cueThen("vessel_launch", {}, () => {
           if (G.flight !== f || f.phase !== "launching") return;
           f.phase = "out";
-          startLeg(f, c.marker, VESSEL_MAX, MIN_FLIGHT_S, true, MAX_FLIGHT_S);
+          /* state LAUNCHING -> CRUISE: one constant speed for the whole leg. The "on approach" line is
+             placed by DISTANCE: it starts when the vessel is as far from the pin as it travels while that
+             line plays (plus a beat), so the line ends about as the vessel arrives. */
+          const km = dist(f, c.marker);
+          f.speed = clamp(km / CRUISE_S, CRUISE_MIN, CRUISE_MAX);
+          f.apprKm = Math.min(f.speed * (Sfx.estimate("dispatch_on_approach", "dispatch_blip") + 0.4), km * 0.5);
+          f.phase = "out";
           Sfx.loopStart("vessel_travel_loop");
           say("dispatch_vessel_away", DISPATCH.dispatch_vessel_away, "DISPATCH");
-          say("dispatch_on_approach", DISPATCH.dispatch_on_approach, "DISPATCH");   /* queued now: plays right after, mid-flight */
         });
       }
-    } else if (f.phase === "out") {
-      if (stepLeg(f, c.marker, dt)) {
+    } else if (f.phase === "out" || f.phase === "approach") {
+      /* CRUISE -> APPROACH at the measured distance; if "vessel away" is still talking it is cut off */
+      if (f.phase === "out" && dist(f, c.marker) <= f.apprKm) {
+        f.phase = "approach";
+        Sfx.cutVoices();
+        say("dispatch_on_approach", DISPATCH.dispatch_on_approach, "DISPATCH");
+      }
+      if (moveVessel(f, c.marker, f.speed, dt)) {
         Sfx.loopStop("vessel_travel_loop");
         f.phase = "arrived"; f.t = 0.3;
       }
@@ -1325,7 +1351,7 @@ const Triangulate = (() => {
       if (f.t <= 0 && free) {                                   /* wait for the lines before to finish */
         if (f.outcome === "miss") { f.phase = "hold"; f.t = 1.0; toast(`<div class="t-head">NO CONTACT AT COORDINATES</div><div class="t-sub">SCANNING...</div>`); }
         else { f.phase = "reacting"; foundShip(f); }
-      }
+      } else if (f.t < -0.8 && !free) Sfx.cutVoices();     /* an approach line that overran: cut it, the beats must go on */
     } else if (f.phase === "creep") {
       if (moveVessel(f, c.target, f.speed, dt)) {
         Sfx.loopStop("vessel_travel_loop");
