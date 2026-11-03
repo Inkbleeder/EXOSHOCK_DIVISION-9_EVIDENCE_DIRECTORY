@@ -77,6 +77,7 @@ const Triangulate = (() => {
   const VESSEL_MAX = 30;                      /* km per second: the fastest the synced flight may ever go */
   const MAX_FLIGHT_S = 6;                     /* s: a synced outbound flight never takes longer than this, however long the lines are */
   const MAX_SUPPLY_S = 5;                     /* s: same cap for the supply ship's trip in */
+  const CRUISE_MAX_S = 9;                     /* s: longest flight allowed when the voice lines are long */
   const CRUISE_S = 5;                         /* s: a typical outbound flight; speed = distance / this ... */
   const CRUISE_MIN = 5, CRUISE_MAX = 26;      /* ... kept between these, then held constant for the whole leg */
   const MIN_LEG_SPEED = 5;                    /* km per second: slowest a synced leg ever moves, so it always reaches its goal */
@@ -1329,8 +1330,15 @@ const Triangulate = (() => {
              placed by DISTANCE: it starts when the vessel is as far from the pin as it travels while that
              line plays (plus a beat), so the line ends about as the vessel arrives. */
           const km = dist(f, c.marker);
-          f.speed = clamp(km / CRUISE_S, CRUISE_MIN, CRUISE_MAX);
-          f.apprKm = Math.min(f.speed * (Sfx.estimate("dispatch_on_approach", "dispatch_blip") + 0.4), km * 0.5);
+          /* size the flight to the two lines: long enough for both (capped), then split the flight between
+             them in proportion to their lengths, so each plays as much as the leg allows */
+          const dA = Sfx.estimate("dispatch_vessel_away", "dispatch_blip");
+          const dB = Sfx.estimate("dispatch_on_approach", "dispatch_blip");
+          const want = clamp(dA + dB + 0.6, CRUISE_S, CRUISE_MAX_S);
+          f.speed = clamp(km / want, CRUISE_MIN, CRUISE_MAX);
+          const T = km / f.speed;                                  /* the real flight time */
+          const tAway = T * dA / Math.max(dA + dB, 0.1);           /* when the "away" line's share ends */
+          f.apprKm = clamp(km - f.speed * tAway, km * 0.15, km * 0.85);
           f.phase = "out";
           Sfx.loopStart("vessel_travel_loop");
           say("dispatch_vessel_away", DISPATCH.dispatch_vessel_away, "DISPATCH");
@@ -1351,7 +1359,7 @@ const Triangulate = (() => {
       if (f.t <= 0 && free) {                                   /* wait for the lines before to finish */
         if (f.outcome === "miss") { f.phase = "hold"; f.t = 1.0; toast(`<div class="t-head">NO CONTACT AT COORDINATES</div><div class="t-sub">SCANNING...</div>`); }
         else { f.phase = "reacting"; foundShip(f); }
-      } else if (f.t < -0.8 && !free) Sfx.cutVoices();     /* an approach line that overran: cut it, the beats must go on */
+      } else if (f.t < -1.5 && !free) Sfx.cutVoices();     /* an approach line that overran: cut it, the beats must go on */
     } else if (f.phase === "creep") {
       if (moveVessel(f, c.target, f.speed, dt)) {
         Sfx.loopStop("vessel_travel_loop");
