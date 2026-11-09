@@ -324,7 +324,7 @@ add({
     title: "Mid-Contract Chest Camera - Active Combat Detected 06",
     category: "Surveillance",
     subcategory: "Operative Chest Camera",
-    file: "mid_contract_chest_camera_div9_operative_footage_active-combat-detected_06.png",
+    file: "mid_contract_chest_camera_div9_operative_footage_(active-combat-detected)_06.png",
     order: 6,
 });
 
