@@ -237,7 +237,7 @@ add({
     title: "Idle Environment Audio Capture 01 (Lobby)",
     category: "Surveillance",
     subcategory: "Idle Enviroment",
-    file: "Idle_Environment_Audio_Capture_01_(Lobby)_.mp3",
+    file: "idle_environment_audio_capture_01_(lobby)_.mp3",
     order: 22,
     related: ["Idle Environment Capture 01 (Lobby)"],
 });
@@ -420,7 +420,7 @@ add({
     title: "Archived BSLSK Div9 Intercepted Coms Record (Hostile Automated Defense Automatons)",
     category: "Administration",
     subcategory: "Contracts",
-    file: "Archived_BSLSK_Div9_Intercepted_Coms_Record_Hostile_(Automated_Defense_Automatons)_.mp3",
+    file: "archived_bslsk_div9_intercepted_coms_record_hostile_(automated_defense_automatons)_.mp3",
     order: 4,
 });
 
