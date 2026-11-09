@@ -233,6 +233,15 @@ add({
     order: 21,
 });
 
+add({
+    title: "Idle Environment Audio Capture 01 (Lobby)",
+    category: "Surveillance",
+    subcategory: "Idle Enviroment",
+    file: "Idle_Environment_Audio_Capture_01_Lobby_.mp3",
+    order: 22,
+    related: ["Idle Environment Capture 01 (Lobby)"],
+});
+
 /* ---- Surveillance / Drone Camera Feed ---- */
 
 add({
@@ -405,6 +414,14 @@ add({
     subcategory: "Contracts",
     file: "archived_bslsk_div9_contract_identification_coms_records_staff.mp3",
     order: 3,
+});
+
+add({
+    title: "Archived BSLSK Div9 Intercepted Coms Record (Hostile Automated Defense Automatons)",
+    category: "Administration",
+    subcategory: "Contracts",
+    file: "Archived_BSLSK_Div9_Intercepted_Coms_Record_Hostile_Automated_Defense_Automatons_.mp3",
+    order: 4,
 });
 
 /* ================= PERSONNEL ================= */
